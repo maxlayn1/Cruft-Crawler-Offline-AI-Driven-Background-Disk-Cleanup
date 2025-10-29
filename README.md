@@ -19,4 +19,8 @@ https://github.com/kmf-lab/steady-state-stack
 Steady-State Documentation:
 https://docs.rs/steady_state/latest/steady_state/
 
+llama.cpp Documentation:
+https://docs.rs/llama_cpp/latest/llama_cpp/
 
+Sled DB Documentation:
+https://docs.rs/sled/latest/sled/
