@@ -4,5 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+anyhow = "1.0.100"
 cargo-steady-state = "0.2.5"
-llama_cpp = "0.3.2"
+encoding_rs = "0.8.35"
+llama-cpp-2 = "0.1.124"
