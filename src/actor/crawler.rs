@@ -5,16 +5,11 @@ use std::error::Error;
 
 #[allow(unused_imports)]
 use std::time::Duration;
-// use std::thread::sleep;
+
+// have here for implementing state later
 // use crate::db_manager::db_state;
 
-
-// have struct metadata to send to other actor but 
-// have another struct to persist state if actor fails, allows you to go back to previous file that you had
-// need to implement
-
-
-// This struct needs a way to print it so we know what tto do I guess
+// derived fn that allow cloning and printing
 #[derive(Default, Clone, Debug, PartialEq, Eq)]
 pub(crate) struct FileMeta {
     pub path: PathBuf,
@@ -27,8 +22,13 @@ pub(crate) struct FileMeta {
     pub readonly: bool,
 } 
 
+//TODO: replace SahomeDB back with Sled
+//TODO: import hashing crate and hash first chunk of files
+//TODO: hard-code values for different file-types and how to treat them
+//TODO: implement Walkdir to recursively get different directories
+//TODO: Implement state or communication to Database to ensure its crawling in correct location on actor failure
 
-// add db_manager_rx back for persistence?
+// run function 
 pub async fn run(actor: SteadyActorShadow,
                  crawler_tx: SteadyTx<FileMeta>) -> Result<(),Box<dyn Error>> {
 
@@ -36,13 +36,13 @@ pub async fn run(actor: SteadyActorShadow,
 }
 
 
-
+// Internal behaviour for the actor
 async fn internal_behavior<A: SteadyActor>(mut actor: A,
 					   crawler_tx: SteadyTx<FileMeta> ) -> Result<(),Box<dyn Error>> {
 
     let mut crawler_tx = crawler_tx.lock().await;
 
-    let dir = Path::new("c:/Users/Shayn/Desktop/Programming/Cruft-Crawler/Cruft-Crawler/src/crawl_test/");
+    let dir = Path::new("crawl_test/");
     let metas = visit_dir(dir)?;
 
     while actor.is_running(|| crawler_tx.mark_closed()) {
@@ -52,9 +52,8 @@ async fn internal_behavior<A: SteadyActor>(mut actor: A,
 	for m in &metas {
 	actor.wait_vacant(&mut crawler_tx, 1).await; 
 
-	// this is probably causing the retun None issue because we need to use actor.wait_periodic() instead
-	// sleep(Duration::from_millis(4000));
-
+	// awaiting either sleeping the thread or actor.wait_periodic() cause's a return None issue at the end
+	// actor.wait_periodic(Duration::from_millis(1000)).await;
 
 	actor.try_send(&mut crawler_tx, m.clone()).expect("couldn't send to DB");
 	}
@@ -63,7 +62,6 @@ async fn internal_behavior<A: SteadyActor>(mut actor: A,
     }
 	return Ok(());
 }
-
 
 
 
