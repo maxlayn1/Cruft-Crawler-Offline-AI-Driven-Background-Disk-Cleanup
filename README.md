@@ -2,25 +2,19 @@
 Cruft Crawler is an LLM-first background agent that runs entirely offline from a 64 GB USB drive. It profiles the filesystem slowly over time with imperceptible CPU load.
 It uses a local quantized LLM to help recommend safe deletions, and delivers a concise AI-generated report.
 
+# TODO (final presentation)
 
-# Resources (For Team)
-The Rust Programming Language Book:
-https://doc.rust-lang.org/book/ch00-00-introduction.html
+## crawler actor
+- [ ] TODO: import hashing crate and hash first chunk of files
+- [ ] TODO: hard-code values for different file-types and how to treat them
+- [ ] TODO: implement Walkdir to recursively get different directories
+- [ ] TODO: Implement state or communication to Database to ensure its crawling in correct location on actor failure
 
-Rust by Example:
-https://doc.rust-lang.org/rust-by-example/index.html
+## db_manager actor
+- [ ] TODO: Remove SahomeDB, use Sled instead
+- [ ] TODO: push all the metadata into the Sled database 
+- [ ] TODO: research a way to view the sled database for presentation
 
-Youtube Series:
-https://youtu.be/BpPEoZW5IiY
-
-Steady-State Tutorial and Repo:
-https://github.com/kmf-lab/steady-state-stack 
-
-Steady-State Documentation:
-https://docs.rs/steady_state/latest/steady_state/
-
-llama.cpp Documentation:
-https://docs.rs/llama_cpp/latest/llama_cpp/
-
-Sled DB Documentation:
-https://docs.rs/sled/latest/sled/
+## (stretch) implement the llama.cpp actor into the prototype
+- [ ] TODO: make Max's llama code actor compliant
+- [ ] TODO: port over Max's llama actor
