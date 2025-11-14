@@ -22,10 +22,29 @@ pub(crate) struct FileMeta {
     pub readonly: bool,
 } 
 
-//TODO: replace SahomeDB back with Sled
-//TODO: import hashing crate and hash first chunk of files
-//TODO: hard-code values for different file-types and how to treat them
+// for easy printing and 
+impl FileMeta {
+   pub fn printMeta(&self) {
+	println!("Printing Metadata Object -----------");
+	println!("File_Path: {:?}", self.path);
+	println!("File_Name: {}", self.file_name);
+	println!("is_file: {}", self.is_file);
+	println!("is_dir: {}", self.is_dir);
+	println!("size: {}", self.size);
+	println!("modified: {:?}", self.modified);
+	println!("created: {:?}", self.created);
+	println!("read-only: {}", self.readonly);
+	println!("Printing Metadata Object -----------\n");
+    }
+}
+
+
 //TODO: implement Walkdir to recursively get different directories
+//TODO: see about replacing SystemTime, with another field for better parsing
+//TODO: import hashing crate and hash first chunk of files or vector embedding
+//TODO: hard-code values for different file-types and how to treat them
+//TODO: replace SahomeDB back with Sled
+//TODO: create DB schema for Sled / SahomeDB
 //TODO: Implement state or communication to Database to ensure its crawling in correct location on actor failure
 
 // run function 
