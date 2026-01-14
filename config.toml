@@ -1,0 +1,14 @@
+title = "config-file"
+
+[directory]
+path = "./"
+last-accessed = ""
+
+[database]
+copies = 1
+batch-size = 15
+
+[LLM]
+temp = 1.0
+## etc variables here for LLM settings that we can tweak
+
