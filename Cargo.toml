@@ -3,11 +3,10 @@ unused_imports = "allow"
 
 [package]
 name = "cruft-crawler"
-version = "0.0.2"
 edition = "2024"
 
 [dependencies]
-steady_state = "0.2.5"  
+steady_state = "0.2.8"
 sled = "0.34.7"
 walkdir ="2.5.0"
 filetime = "0.2.26"
@@ -15,3 +14,4 @@ sha2 = "0.10.9"
 hex = "0.4.3"
 serde = "1.0.228"
 serde_cbor = "0.11.2"
+toml = "0.9.11"

@@ -14,8 +14,8 @@ use hex;
 
 // TODO: change state within visit_dir()
 // TODO: implement fallback logic
-// TODO: implement file cruft_utils.rs for get_file_hash and other non actor utilities to reside in
 // TODO: cleanup crate names
+// TODO: implement file cruft_utils.rs for get_file_hash and other non actor utilities to reside in
 
 // Internal state that helps return back to last crawled entry
 pub(crate) struct CrawlerState {
@@ -92,10 +92,9 @@ async fn internal_behavior<A: SteadyActor>(mut actor: A, crawler_tx: SteadyTx<Fi
 
     let path1 = Path::new("./src/test_directory/");
 
-    // array of metadata structs
     // TODO: change value of state inside this function before pushing metadata
-    // TODO: might need Box<SteadyState<CrawlerState>>::new() to do this correctly?
-    let metas: Vec<FileMeta> = visit_dir(path1)?;
+    // NOTE: state passed in as mutable reference  &StateGuard<'_, CrawlerState>
+    let metas: Vec<FileMeta> = visit_dir(path1, &state)?;
     
     while actor.is_running(|| crawler_tx.mark_closed()) {
 
@@ -138,7 +137,9 @@ pub fn get_file_hash(file_name: PathBuf) -> Result<String, Box<dyn Error>> {
 
 // function to visit test directory and return metadata of each file and insert into metadata struct
 // also updates state per every entry
-pub fn visit_dir(dir: &Path) -> Result<Vec<FileMeta>, Box<dyn Error>> {
+pub fn visit_dir(dir: &Path,
+                 state: &StateGuard<'_, CrawlerState> ) -> Result<Vec<FileMeta>, Box<dyn Error>> {
+
     let mut metas: Vec<FileMeta> = Vec::new();
 
     // Read the directory (non-recursive)

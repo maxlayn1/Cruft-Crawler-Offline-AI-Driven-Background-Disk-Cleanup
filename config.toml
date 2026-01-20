@@ -1,14 +1,16 @@
 title = "config-file"
 
 [directory]
-path = "./"
+## settings for the crawling actor to use	
+path = ""
 last-accessed = ""
 
 [database]
+## settings for the database configuration
 copies = 1
 batch-size = 15
 
 [LLM]
-temp = 1.0
 ## etc variables here for LLM settings that we can tweak
+temp = 1.0
 
