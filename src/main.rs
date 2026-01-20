@@ -50,8 +50,10 @@ fn build_graph(graph: &mut Graph) {
                , SoloAct);
 
     // receiver actor
+
     actor_builder.with_name(NAME_DB)
         .build(move |actor| actor::db_manager::run(actor, crawler_rx.clone()) 
                , SoloAct);
 
 }
+
