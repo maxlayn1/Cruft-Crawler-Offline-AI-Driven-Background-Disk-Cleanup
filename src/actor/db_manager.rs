@@ -26,12 +26,12 @@ async fn internal_behavior<A: SteadyActor>(mut actor: A,
 
     while actor.is_running(|| crawler_rx.is_closed_and_empty()) {
 
-	actor.wait_avail(&mut crawler_rx, BATCH_SIZE).await;
-	let recieved = actor.try_take(&mut crawler_rx);
+	    actor.wait_avail(&mut crawler_rx, BATCH_SIZE).await;
+	    let recieved = actor.try_take(&mut crawler_rx);
 
-	let msg = recieved.expect("expected FileMeta Struct (db_actor)");
-	let _ = db_add(ctr, msg.clone(), db.clone());
-	msg.meta_print();
+	    let msg = recieved.expect("expected FileMeta Struct (db_actor)");
+	    let _ = db_add(ctr, msg.clone(), db.clone());
+	    msg.meta_print();
 	}
 
   Ok(())
