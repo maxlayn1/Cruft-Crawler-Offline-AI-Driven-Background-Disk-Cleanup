@@ -67,13 +67,13 @@ impl FileMeta {
 
 
 // run function 
-pub async fn run(actor: SteadyActorShadow, crawler_tx: SteadyTx<FileMeta>,
+pub async fn run(actor: SteadyActorShadow, crawler_tx: SteadyTx<FileMeta>, crawler_to_model_tx : SteadyTx<String>,
                  state: SteadyState<CrawlerState>) -> Result<(),Box<dyn Error>> {
 
-    let actor = actor.into_spotlight([], [&crawler_tx]);
+    let actor = actor.into_spotlight([], [&crawler_tx, &crawler_to_model_tx]);
 
 	if actor.use_internal_behavior {
-	    internal_behavior(actor, crawler_tx, state).await
+	    internal_behavior(actor, crawler_tx,crawler_to_model_tx, state).await
 	} else {
 	    actor.simulated_behavior(vec!(&crawler_tx)).await
 	}
@@ -81,7 +81,7 @@ pub async fn run(actor: SteadyActorShadow, crawler_tx: SteadyTx<FileMeta>,
 
 
 // Internal behaviour for the actor
-async fn internal_behavior<A: SteadyActor>(mut actor: A, crawler_tx: SteadyTx<FileMeta>,
+async fn internal_behavior<A: SteadyActor>(mut actor: A, crawler_tx: SteadyTx<FileMeta>, crawler_to_ai_model_tx : SteadyTx<String>,
                                            state: SteadyState<CrawlerState>) -> Result<(),Box<dyn Error>> {
 
     // lock state
@@ -89,6 +89,7 @@ async fn internal_behavior<A: SteadyActor>(mut actor: A, crawler_tx: SteadyTx<Fi
 					       hash: String::new()}).await;
 
     let mut crawler_tx = crawler_tx.lock().await;
+    let mut crawler_to_ai_model_tx = crawler_to_ai_model_tx.lock().await;
 
     let path1 = Path::new("./src/test_directory/");
 
@@ -98,14 +99,21 @@ async fn internal_behavior<A: SteadyActor>(mut actor: A, crawler_tx: SteadyTx<Fi
     
     while actor.is_running(|| crawler_tx.mark_closed()) {
 
-	for m in &metas {
-	actor.wait_vacant(&mut crawler_tx, 1).await; 
-	let message = m.clone();
-	actor.try_send(&mut crawler_tx, message).expect("couldn't send to DB");
-	}
+        //Sending data to ai actor
+        actor.wait_vacant(&mut crawler_to_ai_model_tx, 1).await;
+        let message = "Hello".to_string();
+        actor.try_send(&mut crawler_to_ai_model_tx, message);
+        
+        //sending data to database actor
+        for m in &metas {
+            actor.wait_vacant(&mut crawler_tx, 1).await; 
+            let message = m.clone();
+            actor.try_send(&mut crawler_tx, message).expect("couldn't send to DB");
+	    }
+        
+        //actor.request_shutdown().await; //comment out this line to make the program have an infinite loop.
 
-	actor.request_shutdown().await
-    }
+    } 
 	return Ok(());
 }
 
@@ -115,7 +123,7 @@ async fn internal_behavior<A: SteadyActor>(mut actor: A, crawler_tx: SteadyTx<Fi
 pub fn get_file_hash(file_name: PathBuf) -> Result<String, Box<dyn Error>> {
 
     let mut file = std::fs::File::open(file_name)?;
-
+    
     // buffer of 1024 bytes to read file
     let mut buffer = [0u8; 1024];
 
