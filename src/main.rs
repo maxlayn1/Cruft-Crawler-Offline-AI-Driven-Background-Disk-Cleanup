@@ -29,7 +29,7 @@ fn main() -> anyhow::Result<()> {
     let mut ctx = model.new_context(&backend, ctx_params)?;
 
     // The prompt
-    let prompt = "What is the capital of France? Limit your response to only one word, that being the answer to the question asked.";
+    let prompt = "Generate me one letter, I mean literally, from A-Z";
     
     // Tokenize the prompt
     let tokens = model.str_to_token(prompt, AddBos::Always)?;
