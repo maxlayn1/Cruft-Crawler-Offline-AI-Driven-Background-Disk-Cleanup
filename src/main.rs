@@ -22,9 +22,9 @@ fn main() -> anyhow::Result<()> {
         &model_params
     )?;
 
-    // Create context with 2048 token context size
+    // Create context size
     let ctx_params = LlamaContextParams::default()
-        .with_n_ctx(Some(NonZeroU32::new(2048).unwrap()));
+        .with_n_ctx(Some(NonZeroU32::new(256).unwrap()));
     
     let mut ctx = model.new_context(&backend, ctx_params)?;
 
