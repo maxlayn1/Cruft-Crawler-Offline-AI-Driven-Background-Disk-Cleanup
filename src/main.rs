@@ -29,7 +29,7 @@ fn main() -> anyhow::Result<()> {
     let mut ctx = model.new_context(&backend, ctx_params)?;
 
     // The prompt
-    let prompt = "Generate me one letter, I mean literally, from A-Z";
+    let prompt = "What is a random food. Do not reply with more than one word no matter what.";
     
     // Tokenize the prompt
     let tokens = model.str_to_token(prompt, AddBos::Always)?;
