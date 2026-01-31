@@ -1,5 +1,8 @@
 use steady_state::*;
 use std::time::Duration;
+use std::fs;
+
+use crate::llm_engine::LlmEngine;
 // use crate::actor::crawler::FileMeta;
 
 // crate that adds in both the actors from the actor/ directory
@@ -10,11 +13,14 @@ pub(crate) mod actor {
     pub(crate) mod user_interface;
     pub(crate) mod file_handler;
 }
+pub(crate) mod llm_engine;
+
+
 
 //TODO: Add functionality for priority setting using screensaver api
 
 fn main() -> Result<(), Box<dyn Error>> {
-
+    
     init_logging(LogLevel::Info)?;   
 
     // pass unit value into .build() to ignore cli_args for now
@@ -24,7 +30,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     graph.start();  
 
-    graph.block_until_stopped(Duration::from_secs(1)) 
+    graph.block_until_stopped(Duration::from_secs(1))
 }
 
 const NAME_CRAWLER: &str = "CRAWLER";
@@ -83,7 +89,5 @@ fn build_graph(graph: &mut Graph) {
         .build(move |actor | actor::file_handler::run(actor, ui_to_file_handler_rx.clone(), file_handler_to_db_tx.clone())
                 , SoloAct);
                 
-
-
 }
 
