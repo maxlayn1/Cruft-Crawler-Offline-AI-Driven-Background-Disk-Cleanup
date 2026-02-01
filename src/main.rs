@@ -40,7 +40,7 @@ fn main() -> anyhow::Result<()> {
     println!("Generating response...\n");
 
     // Create a batch and add all prompt tokens
-    let mut batch = LlamaBatch::new(512, 1);
+    let mut batch = LlamaBatch::new(64, 1);
     let last_index = (tokens.len() - 1) as i32;
     
     for (i, token) in tokens.into_iter().enumerate() {
