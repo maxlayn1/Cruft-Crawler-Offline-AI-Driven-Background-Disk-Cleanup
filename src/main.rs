@@ -24,7 +24,9 @@ fn main() -> anyhow::Result<()> {
 
     // Create context size
     let ctx_params = LlamaContextParams::default()
-        .with_n_ctx(Some(NonZeroU32::new(256).unwrap()));
+        .with_n_ctx(Some(NonZeroU32::new(256).unwrap()))
+        .with_n_threads(1)
+        .with_n_threads_batch(1);
     
     let mut ctx = model.new_context(&backend, ctx_params)?;
 
