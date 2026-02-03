@@ -8,21 +8,24 @@ use llama_cpp_2::sampling::LlamaSampler;
 use std::io::Write;
 use std::num::NonZeroU32;
 
+use std::time::Duration;
+use std::thread::sleep;
+
 fn main() -> anyhow::Result<()> {
-    // Initialize the backend
+    // init the backend
     let backend = LlamaBackend::init()?;
 
-    // Set up model parameters
+    // set up model parameters
     let model_params = LlamaModelParams::default();
     
-    // Load the model
+    // load the model
     let model = LlamaModel::load_from_file(
         &backend,
         "models/Llama-3.2-3B-Instruct-Q4_K_M.gguf",
         &model_params
     )?;
 
-    // Create context size
+    // create context size (could maybe go smaller than 256 for more preformance?)
     let ctx_params = LlamaContextParams::default()
         .with_n_ctx(Some(NonZeroU32::new(256).unwrap()))
         .with_n_threads(1)
@@ -30,52 +33,75 @@ fn main() -> anyhow::Result<()> {
     
     let mut ctx = model.new_context(&backend, ctx_params)?;
 
-    // The prompt
+    // the prompt
     let prompt = "The sky is blue. Is this statement true or false? Do not output anything besides either TRUE or FALSE under ANY circumstances.";
     
-    // Tokenize the prompt
+    // tokenize the prompt
     let tokens = model.str_to_token(prompt, AddBos::Always)?;
     
     println!("Prompt: {}", prompt);
     println!("Generating response...\n");
 
-    // Create a batch and add all prompt tokens
+    // --- tunable knobs ---!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    let chunk_size: usize = 4;                      // tokens per chunk
+    let chunk_delay = Duration::from_millis(200);   // pause between chunks
+    // ----------------------
+
     let mut batch = LlamaBatch::new(64, 1);
-    let last_index = (tokens.len() - 1) as i32;
-    
-    for (i, token) in tokens.into_iter().enumerate() {
-        let is_last = i as i32 == last_index;
-        batch.add(token, i as i32, &[0], is_last)?;
+    let total = tokens.len();
+    let chunks: Vec<&[llama_cpp_2::token::LlamaToken]> = tokens.chunks(chunk_size).collect();
+    let num_chunks = chunks.len();
+
+    // feed prompt tokens in chunks, sleeping between each to spread CPU load
+    let mut last_chunk_len: i32 = 0;
+    for (chunk_idx, chunk) in chunks.iter().enumerate() {
+        let is_last_chunk = chunk_idx == num_chunks - 1;
+
+        for (i, &token) in chunk.iter().enumerate() {
+            let pos = (chunk_idx * chunk_size + i) as i32;
+            let needs_logits = is_last_chunk && i == chunk.len() - 1;
+            batch.add(token, pos, &[0], needs_logits)?;
+        }
+
+        ctx.decode(&mut batch)?;
+        batch.clear();
+        last_chunk_len = chunk.len() as i32;
+
+        if !is_last_chunk {
+            sleep(chunk_delay);
+        }
     }
 
-    // Process the prompt
-    ctx.decode(&mut batch)?;
+    let mut n_cur = total as i32;
 
-    // Set up sampler (greedy sampling - always picks most likely token)
+    // set up sampler (always picks most likely token)
     let mut sampler = LlamaSampler::chain_simple([
         LlamaSampler::dist(1234), // seed
         LlamaSampler::greedy(),
     ]);
 
-    // Generate tokens
-    let max_tokens = 100;
-    let mut n_cur = batch.n_tokens();
-    
-    // Decoder for handling UTF-8 properly
+    // decoder for handling UTF-8 properly
     let mut decoder = encoding_rs::UTF_8.new_decoder();
 
+    // generate tokens
+    let max_tokens = 100;
+
+    // logits index: points to where logits were requested within the last decoded batch.
+    // after prompt: last token of the final chunk. During generation: always 0 (single-token batch).
+    let mut logits_idx = last_chunk_len - 1;
+
     for _ in 0..max_tokens {
-        // Sample the next token
-        let token = sampler.sample(&ctx, batch.n_tokens() - 1);
+        // sample the next token using the batch-local logits index
+        let token = sampler.sample(&ctx, logits_idx);
         sampler.accept(token);
 
-        // Check for end of generation
+        // check for end of generation
         if model.is_eog_token(token) {
             println!();
             break;
         }
 
-        // Convert token to bytes and then to string
+        // convert token to bytes and then to string
         let output_bytes = model.token_to_bytes(token, Special::Tokenize)?;
         let mut output_string = String::with_capacity(32);
         decoder.decode_to_string(&output_bytes, &mut output_string, false);
@@ -83,10 +109,11 @@ fn main() -> anyhow::Result<()> {
         print!("{}", output_string);
         std::io::stdout().flush()?;
 
-        // Prepare next iteration
+        // prepare next iteration: single-token batch, so logits index is always 0
         batch.clear();
         batch.add(token, n_cur, &[0], true)?;
         n_cur += 1;
+        logits_idx = 0;
 
         ctx.decode(&mut batch)?;
     }
