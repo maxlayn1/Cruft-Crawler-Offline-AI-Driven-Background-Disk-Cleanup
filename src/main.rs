@@ -36,7 +36,7 @@ fn main() -> anyhow::Result<()> {
     // load the model
     let model = LlamaModel::load_from_file(
         &backend,
-        "models/Llama-3.2-3B-Instruct-Q4_K_M.gguf",
+        "models/llama-3.2-3b-instruct-q8_0.gguf",
         &model_params
     )?;
 
@@ -49,7 +49,16 @@ fn main() -> anyhow::Result<()> {
     let mut ctx = model.new_context(&backend, ctx_params)?;
 
     // the prompt
-    let prompt = "The sky is blue. Is this statement true or false? Do not output anything besides either TRUE or FALSE under ANY circumstances.";
+    let prompt = "You are an automated file management assistant. You must make a single decision about whether to keep or delete a file based solely on the metadata provided. Do not explain, justify, or add anything else. Your response must be exactly one word: either \"keep\" or \"delete\".
+
+File metadata:
+Name: temp_export_2026-01-15.csv
+Size: 2 MB
+Last modified: 2026-01-15 02:14:00
+Owner: Jace Ackerman
+Other relevant metadata: generated automatically by a nightly export script, no important data inside, has not been accessed since creation, duplicates other main reports
+
+Decision:";
     
     // tokenize the prompt
     let tokens = model.str_to_token(prompt, AddBos::Always)?;
