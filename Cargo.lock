@@ -9,6 +9,7 @@ dependencies = [
  "anyhow",
  "cargo-steady-state",
  "encoding_rs",
+ "libc",
  "llama-cpp-2",
 ]
 

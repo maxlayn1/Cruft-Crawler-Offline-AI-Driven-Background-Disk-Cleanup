@@ -1,3 +1,7 @@
+//this version adds libc library in the toml file
+//to allow for pinning the process to a specific 
+//core from within the code
+
 use llama_cpp_2::context::params::LlamaContextParams;
 use llama_cpp_2::llama_backend::LlamaBackend;
 use llama_cpp_2::llama_batch::LlamaBatch;
@@ -12,6 +16,17 @@ use std::time::Duration;
 use std::thread::sleep;
 
 fn main() -> anyhow::Result<()> {
+
+    // pin this process to CPU core 0
+    #[cfg(target_os = "linux")]
+    {
+        unsafe {
+            let mut cpu_set: libc::cpu_set_t = std::mem::zeroed();
+            libc::CPU_SET(0, &mut cpu_set); // pin to core 0 (change to 1, 2, etc. for other cores)
+            libc::sched_setaffinity(0, std::mem::size_of::<libc::cpu_set_t>(), &cpu_set);
+        }
+    }
+    
     // init the backend
     let backend = LlamaBackend::init()?;
 
