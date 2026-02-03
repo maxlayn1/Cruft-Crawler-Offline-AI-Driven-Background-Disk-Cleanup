@@ -59,7 +59,7 @@ fn main() -> anyhow::Result<()> {
 
     // --- tunable knobs ---!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     let chunk_size: usize = 4;                      // tokens per chunk
-    let chunk_delay = Duration::from_millis(200);   // pause between chunks
+    let chunk_delay = Duration::from_millis(10000);   // pause between chunks
     // ----------------------
 
     let mut batch = LlamaBatch::new(64, 1);
