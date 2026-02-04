@@ -24,6 +24,11 @@ fn main() -> anyhow::Result<()> {
             let mut cpu_set: libc::cpu_set_t = std::mem::zeroed();
             libc::CPU_SET(0, &mut cpu_set); // pin to core 0 (change to 1, 2, etc. for other cores)
             libc::sched_setaffinity(0, std::mem::size_of::<libc::cpu_set_t>(), &cpu_set);
+            
+            // set nice value (range: -20 to 19, where 19 is lowest priority)
+            // positive values = lower priority, negative = higher priority (requires root)
+            //let nice_value = 19; // adjust as needed
+            //libc::setpriority(libc::PRIO_PROCESS, 0, nice_value);
         }
     }
     
@@ -67,7 +72,7 @@ Decision:";
 
     // --- tunable knobs ---!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     let chunk_size: usize = 4;                      // tokens per chunk
-    let chunk_delay = Duration::from_millis(200);   // pause between chunks
+    let chunk_delay = Duration::from_millis(10000);   // pause between chunks
     // ----------------------
 
     let mut batch = LlamaBatch::new(64, 1);
