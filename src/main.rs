@@ -1,18 +1,17 @@
 use llama_cpp_2::context::params::LlamaContextParams;
 use llama_cpp_2::llama_backend::LlamaBackend;
 use llama_cpp_2::llama_batch::LlamaBatch;
-use llama_cpp_2::model::params::LlamaModelParams;
 use llama_cpp_2::model::LlamaModel;
+use llama_cpp_2::model::params::LlamaModelParams;
 use llama_cpp_2::model::{AddBos, Special};
 use llama_cpp_2::sampling::LlamaSampler;
 use std::io::Write;
 use std::num::NonZeroU32;
 
-use std::time::Duration;
 use std::thread::sleep;
+use std::time::Duration;
 
 fn main() -> anyhow::Result<()> {
-
     // pin this process to CPU core 0
     #[cfg(target_os = "linux")]
     {
@@ -20,25 +19,25 @@ fn main() -> anyhow::Result<()> {
             let mut cpu_set: libc::cpu_set_t = std::mem::zeroed();
             libc::CPU_SET(0, &mut cpu_set); // pin to core 0 (change to 1, 2, etc. for other cores)
             libc::sched_setaffinity(0, std::mem::size_of::<libc::cpu_set_t>(), &cpu_set);
-            
+
             // set nice value (range: -20 to 19, where 19 is lowest priority)
             // positive values = lower priority, negative = higher priority (requires root)
             let nice_value = 19; // adjust as needed
             libc::setpriority(libc::PRIO_PROCESS, 0, nice_value);
         }
     }
-    
+
     // init the backend
     let backend = LlamaBackend::init()?;
 
     // set up model parameters
     let model_params = LlamaModelParams::default();
-    
+
     // load the model
     let model = LlamaModel::load_from_file(
         &backend,
         "models/llama-3.2-3b-instruct-q8_0.gguf",
-        &model_params
+        &model_params,
     )?;
 
     // create context size (reduced to 128 from 256 for more CPU optimization)
@@ -46,7 +45,7 @@ fn main() -> anyhow::Result<()> {
         .with_n_ctx(Some(NonZeroU32::new(128).unwrap()))
         .with_n_threads(1)
         .with_n_threads_batch(1);
-    
+
     let mut ctx = model.new_context(&backend, ctx_params)?;
 
     // the prompt
@@ -59,18 +58,18 @@ Last modified: 4 months ago
 Owner: Jace Ackerman
 
 Decision:";
-    
+
     // tokenize the prompt
     let tokens = model.str_to_token(prompt, AddBos::Always)?;
-    
+
     println!("Prompt: {}", prompt);
     println!("Generating response...\n");
 
     // --- tunable knobs ---!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    let chunk_size: usize = 1;                                     // tokens per chunk (increased to 16 from 4 for less overhead since fewer decode calls)
-    let chunk_delay = Duration::from_millis(1250);       // pause between chunks
-    let gen_delay = Duration::from_millis(30000);        // to throttle generation for reduced CPU load
-    let max_tokens = 20;                                      // since only expecting 'KEEP' or 'DELETE' no need for many tokens
+    let chunk_size: usize = 1; // tokens per chunk (increased to 16 from 4 for less overhead since fewer decode calls)
+    let chunk_delay = Duration::from_millis(1250); // pause between chunks
+    let gen_delay = Duration::from_millis(30000); // to throttle generation for reduced CPU load
+    let max_tokens = 20; // since only expecting 'KEEP' or 'DELETE' no need for many tokens
     // ----------------------
 
     let mut batch = LlamaBatch::new(64, 1);
@@ -125,7 +124,7 @@ Decision:";
         let output_bytes = model.token_to_bytes(token, Special::Tokenize)?;
         let mut output_string = String::with_capacity(32);
         decoder.decode_to_string(&output_bytes, &mut output_string, false);
-        
+
         print!("{}", output_string);
         std::io::stdout().flush()?;
 
@@ -144,6 +143,6 @@ Decision:";
     }
 
     println!("\n");
-    
+
     Ok(())
 }
