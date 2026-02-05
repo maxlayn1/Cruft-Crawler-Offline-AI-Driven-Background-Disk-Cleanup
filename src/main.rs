@@ -45,7 +45,7 @@ fn main() -> anyhow::Result<()> {
         &model_params
     )?;
 
-    // create context size (could maybe go smaller than 256 for more preformance?)
+    // create context size (reduced to 128 from 256 for more CPU optimization)
     let ctx_params = LlamaContextParams::default()
         .with_n_ctx(Some(NonZeroU32::new(256).unwrap()))
         .with_n_threads(1)
