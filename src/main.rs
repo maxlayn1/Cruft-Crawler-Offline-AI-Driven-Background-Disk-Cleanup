@@ -140,6 +140,11 @@ Decision:";
         logits_idx = 0;
 
         ctx.decode(&mut batch)?;
+
+        // throttles generation to further reduce CPU load
+        if !gen_delay.is_zero() {
+            sleep(gen_delay);
+        }
     }
 
     println!("\n");
