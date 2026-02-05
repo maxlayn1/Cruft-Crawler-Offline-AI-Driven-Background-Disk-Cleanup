@@ -27,8 +27,8 @@ fn main() -> anyhow::Result<()> {
             
             // set nice value (range: -20 to 19, where 19 is lowest priority)
             // positive values = lower priority, negative = higher priority (requires root)
-            //let nice_value = 19; // adjust as needed
-            //libc::setpriority(libc::PRIO_PROCESS, 0, nice_value);
+            let nice_value = 19; // adjust as needed
+            libc::setpriority(libc::PRIO_PROCESS, 0, nice_value);
         }
     }
     
