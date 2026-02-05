@@ -71,10 +71,10 @@ Decision:";
     println!("Generating response...\n");
 
     // --- tunable knobs ---!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    let chunk_size: usize = 2;                                     // tokens per chunk (increased to 16 from 4 for less overhead since fewer decode calls)
-    let chunk_delay = Duration::from_millis(10000);       // pause between chunks
-    let gen_delay = Duration::from_millis(0);           // to throttle generation for reduced CPU load
-    let max_tokens = 20;                                       // since only expecting 'KEEP' or 'DELETE' no need for many tokens
+    let chunk_size: usize = 1;                                     // tokens per chunk (increased to 16 from 4 for less overhead since fewer decode calls)
+    let chunk_delay = Duration::from_millis(1250);       // pause between chunks
+    let gen_delay = Duration::from_millis(30000);        // to throttle generation for reduced CPU load
+    let max_tokens = 20;                                      // since only expecting 'KEEP' or 'DELETE' no need for many tokens
     // ----------------------
 
     let mut batch = LlamaBatch::new(64, 1);
