@@ -1,7 +1,3 @@
-//this version adds libc library in the toml file
-//to allow for pinning the process to a specific 
-//core from within the code
-
 use llama_cpp_2::context::params::LlamaContextParams;
 use llama_cpp_2::llama_backend::LlamaBackend;
 use llama_cpp_2::llama_batch::LlamaBatch;
@@ -47,7 +43,7 @@ fn main() -> anyhow::Result<()> {
 
     // create context size (reduced to 128 from 256 for more CPU optimization)
     let ctx_params = LlamaContextParams::default()
-        .with_n_ctx(Some(NonZeroU32::new(256).unwrap()))
+        .with_n_ctx(Some(NonZeroU32::new(128).unwrap()))
         .with_n_threads(1)
         .with_n_threads_batch(1);
     
