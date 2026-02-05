@@ -71,8 +71,10 @@ Decision:";
     println!("Generating response...\n");
 
     // --- tunable knobs ---!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    let chunk_size: usize = 4;                      // tokens per chunk
+    let chunk_size: usize = 16;                      // tokens per chunk (increased to 16 from 4 for less overhead since fewer decode calls)
     let chunk_delay = Duration::from_millis(10000);   // pause between chunks
+    
+    let max_tokens = 20; //since only expecting 'KEEP' or 'DELETE' no need for many tokens
     // ----------------------
 
     let mut batch = LlamaBatch::new(64, 1);
@@ -110,9 +112,6 @@ Decision:";
 
     // decoder for handling UTF-8 properly
     let mut decoder = encoding_rs::UTF_8.new_decoder();
-
-    // generate tokens
-    let max_tokens = 100;
 
     // logits index: points to where logits were requested within the last decoded batch.
     // after prompt: last token of the final chunk. During generation: always 0 (single-token batch).
