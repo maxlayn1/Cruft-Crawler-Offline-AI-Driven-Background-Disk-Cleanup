@@ -22,5 +22,5 @@ Cargo.lock
 #.idea/
 
 
-/models
+src/models
 # ignore the whole models folder since you can't push the model files to github
