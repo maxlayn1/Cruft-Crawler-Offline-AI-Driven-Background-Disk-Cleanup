@@ -32,7 +32,7 @@ impl LlmEngine{
 
     fn create_context(&self)-> anyhow::Result<LlamaContext<'_>>{
         let ctx_params = LlamaContextParams::default()
-            .with_n_ctx(Some(NonZeroU32::new(2048).unwrap()));
+            .with_n_ctx(Some(NonZeroU32::new(128).unwrap()));   // context size reduced from 2056 to 128
 
         let ctx = self.model.new_context(&self.backend, ctx_params)?;
         Ok(ctx)
