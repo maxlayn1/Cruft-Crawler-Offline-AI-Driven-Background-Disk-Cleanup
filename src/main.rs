@@ -11,8 +11,8 @@ use std::fs::File;
 use std::fs::OpenOptions;
 use std::io::{BufRead, BufReader, Write};
 use std::num::NonZeroU32;
-use std::thread::sleep;
-use std::time::Duration;
+use std::thread::{sleep, yield_now};
+use std::time::{Duration, Instant};
 
 #[derive(Debug, Deserialize)]
 struct FileMeta {
@@ -33,6 +33,45 @@ struct FileMeta {
     source: String,
 }
 
+// -----------------------------------------------------------
+// Windows: pin process to CPU 0 + set process priority to IDLE
+// (keeps the agent "background" from the OS scheduler's POV)
+// -----------------------------------------------------------
+#[cfg(target_os = "windows")]
+fn set_windows_background_mode() {
+    // Requires windows-sys in Cargo.toml:
+    // windows-sys = { version = "0.52", features = ["Win32_System_Threading"] }
+    use windows_sys::Win32::System::Threading::{
+        GetCurrentProcess, SetPriorityClass, SetProcessAffinityMask, IDLE_PRIORITY_CLASS,
+    };
+
+    unsafe {
+        let proc = GetCurrentProcess();
+        // Affinity mask bit 0 => CPU 0 only
+        let _ = SetProcessAffinityMask(proc, 1);
+        let _ = SetPriorityClass(proc, IDLE_PRIORITY_CLASS);
+    }
+}
+
+// -----------------------------------------------------------
+// CPU noise-floor throttle: enforce a target duty cycle.
+// Example: target = 0.05 means "work 5% of the time, sleep 95%".
+// -----------------------------------------------------------
+fn throttle_after_active(active: Duration, target_duty: f32) {
+    let target = target_duty.clamp(0.01, 0.50);
+
+    // sleep = active * (1-target)/target
+    let active_ns = active.as_nanos() as f64;
+    let mut sleep_ns = active_ns * ((1.0 - target as f64) / target as f64);
+
+    // Windows sleep granularity can be coarse; enforce a minimum to smooth spikes
+    // (prevents bursty "run hard, sleep tiny" behavior)
+    sleep_ns = sleep_ns.max(20_000_000.0); // >= 20ms
+
+    yield_now();
+    sleep(Duration::from_nanos(sleep_ns as u64));
+}
+
 // -------------------------------------------
 // Helper: run one prompt and return keep/delete
 // -------------------------------------------
@@ -42,41 +81,38 @@ fn run_one_prompt(
     ctx_params: &LlamaContextParams,
     prompt: &str,
 ) -> anyhow::Result<String> {
-    // fresh context per record (prevents prompt bleed)
+    // ---- tunable knobs (background-safe) ----
+    const TARGET_DUTY: f32 = 0.05; // 5% duty cycle target
+    const MAX_TOKENS: usize = 3;   // minimal output for keep/delete
+    // ----------------------------------------
+
+    // NOTE: Creating a new context per record can spike CPU.
+    // We throttle context creation too to reduce bursts.
+    let t0 = Instant::now();
     let mut ctx = model.new_context(backend, ctx_params.clone())?;
+    throttle_after_active(t0.elapsed(), TARGET_DUTY);
 
+    // Tokenization can also spike; throttle it too.
+    let t1 = Instant::now();
     let tokens = model.str_to_token(prompt, AddBos::Always)?;
+    throttle_after_active(t1.elapsed(), TARGET_DUTY);
 
-    // ---- tunable knobs (conservative + low CPU) ----
-    let chunk_size: usize = 8;
-    let chunk_delay = Duration::from_millis(250);
-    let gen_delay = Duration::from_millis(0);
-    let max_tokens = 6;
-    // ------------------------------------------------
+    // Small batch since we feed 1 token at a time
+    let mut batch = LlamaBatch::new(32, 1);
 
-    let mut batch = LlamaBatch::new(1024, 1);
-    let chunks: Vec<&[llama_cpp_2::token::LlamaToken]> = tokens.chunks(chunk_size).collect();
-    let num_chunks = chunks.len();
+    // -------------------------
+    // Prefill prompt (1 token per decode to avoid spikes)
+    // -------------------------
+    for (pos, &token) in tokens.iter().enumerate() {
+        let pos = pos as i32;
+        let needs_logits = pos == (tokens.len() as i32 - 1);
 
-    let mut last_chunk_len: i32 = 0;
-
-    // prefill prompt
-    for (chunk_idx, chunk) in chunks.iter().enumerate() {
-        let is_last_chunk = chunk_idx == num_chunks - 1;
-
-        for (i, &token) in chunk.iter().enumerate() {
-            let pos = (chunk_idx * chunk_size + i) as i32;
-            let needs_logits = is_last_chunk && i == chunk.len() - 1;
-            batch.add(token, pos, &[0], needs_logits)?;
-        }
-
-        ctx.decode(&mut batch)?;
         batch.clear();
-        last_chunk_len = chunk.len() as i32;
+        batch.add(token, pos, &[0], needs_logits)?;
 
-        if !is_last_chunk {
-            sleep(chunk_delay);
-        }
+        let td = Instant::now();
+        ctx.decode(&mut batch)?;
+        throttle_after_active(td.elapsed(), TARGET_DUTY);
     }
 
     let mut n_cur = tokens.len() as i32;
@@ -84,12 +120,15 @@ fn run_one_prompt(
     let mut sampler = LlamaSampler::greedy();
     let mut decoder = encoding_rs::UTF_8.new_decoder();
 
-    // after prefill, logits were requested on last token of last chunk
-    let mut logits_idx = last_chunk_len - 1;
+    // Single-token decode => logits index is always 0
+    let mut logits_idx = 0;
 
     let mut out = String::new();
 
-    for _ in 0..max_tokens {
+    // -------------------------
+    // Generate minimal output (1 token per decode)
+    // -------------------------
+    for _ in 0..MAX_TOKENS {
         let token = sampler.sample(&ctx, logits_idx);
         sampler.accept(token);
 
@@ -100,7 +139,6 @@ fn run_one_prompt(
         let bytes = model.token_to_bytes(token, Special::Tokenize)?;
         let mut s = String::with_capacity(32);
         let _ = decoder.decode_to_string(&bytes, &mut s, false);
-
         out.push_str(&s);
 
         // stop early once we clearly have keep/delete
@@ -116,13 +154,12 @@ fn run_one_prompt(
         batch.clear();
         batch.add(token, n_cur, &[0], true)?;
         n_cur += 1;
-        logits_idx = 0; // single-token batch => logits at index 0
 
+        let td = Instant::now();
         ctx.decode(&mut batch)?;
+        throttle_after_active(td.elapsed(), TARGET_DUTY);
 
-        if !gen_delay.is_zero() {
-            sleep(gen_delay);
-        }
+        logits_idx = 0;
     }
 
     // fallback if model outputs something weird (safe default)
@@ -130,6 +167,14 @@ fn run_one_prompt(
 }
 
 fn main() -> anyhow::Result<()> {
+    // -------------------------------
+    // CPU pinning & priority (Windows)
+    // -------------------------------
+    #[cfg(target_os = "windows")]
+    {
+        set_windows_background_mode();
+    }
+
     // -------------------------------
     // CPU pinning & priority (Linux)
     // -------------------------------
@@ -158,8 +203,8 @@ fn main() -> anyhow::Result<()> {
 
     // keep ctx small for CPU/noise-floor testing
     let ctx_params = LlamaContextParams::default()
-        .with_n_ctx(Some(NonZeroU32::new(1024).unwrap()))
-        .with_n_threads(1)
+        .with_n_ctx(Some(NonZeroU32::new(512).unwrap())) // smaller ctx = less work
+        .with_n_threads(1)                               // HARD cap threads
         .with_n_threads_batch(1);
 
     // -------------------------------
@@ -232,7 +277,6 @@ Decision:",
         let decision = run_one_prompt(&model, &backend, &ctx_params, &prompt)?;
 
         writeln!(report, "{}\t{}\t{}", meta.id, meta.path, decision)?;
-
         println!("{} -> {}", meta.id, decision);
     }
 
