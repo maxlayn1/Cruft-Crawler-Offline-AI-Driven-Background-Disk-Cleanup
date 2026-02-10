@@ -43,7 +43,7 @@ impl LlmEngine{
     fn tokenize_prompt(&self, prompt: &str) -> anyhow::Result<LlamaBatch<'_>>{
         let tokens = self.model.str_to_token(prompt, AddBos::Always)?;
 
-        let mut batch = LlamaBatch::new(512,1);
+        let mut batch = LlamaBatch::new(64,1);
         let last_index = (tokens.len() -1) as i32;
 
         for(i, token) in tokens.into_iter().enumerate(){
