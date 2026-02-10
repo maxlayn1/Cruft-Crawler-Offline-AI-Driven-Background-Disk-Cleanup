@@ -10,6 +10,8 @@ use llama_cpp_2::context::LlamaContext;
 use std::io::Write;
 use std::num::NonZeroU32;
 use std::{any, fs};
+use std::time::Duration;
+use std::thread::sleep;
 
 pub struct LlmEngine {
     backend: LlamaBackend,
@@ -43,6 +45,13 @@ impl LlmEngine{
     fn tokenize_prompt(&self, prompt: &str) -> anyhow::Result<LlamaBatch<'_>>{
         let tokens = self.model.str_to_token(prompt, AddBos::Always)?;
 
+        // --- tunable knobs ---!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        let chunk_size: usize = 1; // tokens per chunk (increased to 16 from 4 for less overhead since fewer decode calls)
+        let chunk_delay = Duration::from_millis(1250); // pause between chunks
+        let gen_delay = Duration::from_millis(30000); // to throttle generation for reduced CPU load
+        let max_tokens = 20; // since only expecting 'KEEP' or 'DELETE' no need for many tokens
+        // ----------------------
+        
         let mut batch = LlamaBatch::new(64,1);
         let last_index = (tokens.len() -1) as i32;
 
