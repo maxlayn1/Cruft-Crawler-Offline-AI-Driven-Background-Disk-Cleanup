@@ -12,6 +12,7 @@ export component AppWindow inherits Window {
     title: "Cruft Crawler";
 
     in property <string> status_text: "Idle";
+    in-out property <int> selected_index: -1;
     in property <[ReportRow]> rows;
 
     callback load_report();
@@ -34,8 +35,15 @@ export component AppWindow inherits Window {
 
             Rectangle { width: 1px; height: 20px; }
 
-            Button { text: "Load Report (TSV)"; clicked => { load_report(); } }
-            Button { text: "Run Scan (later)"; clicked => { run_scan(); } }
+            Button {
+                text: "Load Report (TSV)";
+                clicked => { load_report(); }
+            }
+
+            Button {
+                text: "Run Scan (later)";
+                clicked => { run_scan(); }
+            }
         }
 
         Rectangle { height: 1px; }
@@ -43,6 +51,7 @@ export component AppWindow inherits Window {
         // Table header
         HorizontalLayout {
             spacing: 8px;
+
             Text { text: "ID"; width: 120px; }
             Text { text: "Path"; width: 600px; }
             Text { text: "Decision"; width: 120px; }
@@ -55,12 +64,28 @@ export component AppWindow inherits Window {
             VerticalLayout {
                 spacing: 6px;
 
-                for row in rows : HorizontalLayout {
-                    spacing: 8px;
+                for row[i] in rows : Rectangle {
+                    height: 26px;
+                    background: (i == selected_index) ? #303030 : #00000000;
 
-                    Text { text: row.id; width: 120px; }
-                    Text { text: row.path; width: 600px; }
-                    Text { text: row.decision; width: 120px; }
+                    TouchArea {
+                        clicked => { selected_index = i; }
+                    }
+
+                    HorizontalLayout {
+                        spacing: 8px;
+
+                        Text { text: row.id; width: 120px; }
+                        Text { text: row.path; width: 600px; }
+
+                        Text {
+                            text: row.decision;
+                            width: 120px;
+                            color: row.decision == "DELETE" ? #ff6b6b
+                                 : row.decision == "KEEP"   ? #66ff99
+                                 : #ffffff;
+                        }
+                    }
                 }
             }
         }

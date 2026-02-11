@@ -1,1 +1,11 @@
 id	path	decision
+1	C:\Users\Rohit\Downloads\old_installer_v1.exe	DELETE
+2	C:\Users\Rohit\Desktop\project_backup_2022.zip	DELETE
+3	C:\Users\Rohit\Documents\resume_2026.pdf	KEEP
+4	C:\Users\Rohit\AppData\Local\Temp\tmp_839201.log	DELETE
+5	C:\Users\Rohit\Pictures\family_trip_2023.jpg	KEEP
+6	C:\Users\Rohit\Videos\unused_screen_recording.mp4	DELETE
+7	C:\Users\Rohit\Downloads\cuda_installer.exe	KEEP
+8	C:\Users\Rohit\.cargo\registry\cache\unused_crate.tar	DELETE
+9	C:\Users\Rohit\Desktop\important_notes.txt	KEEP
+10	C:\Users\Rohit\AppData\Roaming\SomeApp\old_config.bak	DELETE

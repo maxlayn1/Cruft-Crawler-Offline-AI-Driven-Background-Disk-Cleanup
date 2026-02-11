@@ -1,4 +1,4 @@
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 
 slint::include_modules!();
 
@@ -10,11 +10,23 @@ pub fn run_ui() -> Result<()> {
     // Load Report button
     {
         let ui_weak = ui.as_weak();
+
         ui.on_load_report(move || {
             if let Some(ui) = ui_weak.upgrade() {
-                ui.set_status_text("Loading data/llm_report.tsv...".into());
+                // Open file picker
+                let picked = rfd::FileDialog::new()
+                    .add_filter("TSV report", &["tsv"])
+                    .pick_file();
 
-                match report::load_llm_report_tsv("data/llm_report.tsv") {
+                let Some(path) = picked else {
+                    ui.set_status_text("Load canceled.".into());
+                    return;
+                };
+
+                let path_str = path.to_string_lossy().to_string();
+                ui.set_status_text(format!("Loading {path_str} ...").into());
+
+                match report::load_llm_report_tsv(&path_str) {
                     Ok(rows) => {
                         let slint_rows: Vec<ReportRow> = rows
                             .into_iter()
@@ -25,27 +37,28 @@ pub fn run_ui() -> Result<()> {
                             })
                             .collect();
 
-                        ui.set_rows(slint::ModelRc::new(slint::VecModel::from(slint_rows)));
-                        ui.set_status_text("Loaded report ✅".into());
+                        let count = slint_rows.len(); // compute BEFORE move
+
+                        ui.set_rows(slint::ModelRc::new(
+                            slint::VecModel::from(slint_rows),
+                        ));
+
+                        ui.set_status_text(
+                            format!("Loaded {count} rows ✅").into(),
+                        );
                     }
                     Err(e) => {
-                        ui.set_status_text(format!("Failed to load report: {e}").into());
+                        ui.set_status_text(
+                            format!("Failed to load report: {e}").into(),
+                        );
                     }
                 }
             }
         });
-    }
+    } // important: block ends here
 
-    // Run Scan button (placeholder for now)
-    {
-        let ui_weak = ui.as_weak();
-        ui.on_run_scan(move || {
-            if let Some(ui) = ui_weak.upgrade() {
-                ui.set_status_text("Run Scan: not wired yet (next step)".into());
-            }
-        });
-    }
+    // Start the UI event loop
+    ui.run().map_err(|e| anyhow!(e))?;
 
-    ui.run()?;
     Ok(())
 }
