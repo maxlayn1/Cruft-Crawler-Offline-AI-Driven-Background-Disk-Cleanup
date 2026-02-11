@@ -1,19 +1,68 @@
+import { Button, ScrollView } from "std-widgets.slint";
+
+export struct ReportRow {
+    id: string,
+    path: string,
+    decision: string,
+}
+
 export component AppWindow inherits Window {
-    width: 400px;
-    height: 200px;
+    width: 900px;
+    height: 520px;
     title: "Cruft Crawler";
 
+    in property <string> status_text: "Idle";
+    in property <[ReportRow]> rows;
+
+    callback load_report();
+    callback run_scan();
+
     VerticalLayout {
+        padding: 16px;
         spacing: 12px;
-        padding: 20px;
 
         Text {
-            text: "Cruft Crawler UI";
-            font-size: 20px;
+            text: "Cruft Crawler";
+            font-size: 22px;
         }
 
-        Text {
-            text: "Slint is working ✅";
+        HorizontalLayout {
+            spacing: 12px;
+
+            Text { text: "Status:"; }
+            Text { text: status_text; }
+
+            Rectangle { width: 1px; height: 20px; }
+
+            Button { text: "Load Report (TSV)"; clicked => { load_report(); } }
+            Button { text: "Run Scan (later)"; clicked => { run_scan(); } }
+        }
+
+        Rectangle { height: 1px; }
+
+        // Table header
+        HorizontalLayout {
+            spacing: 8px;
+            Text { text: "ID"; width: 120px; }
+            Text { text: "Path"; width: 600px; }
+            Text { text: "Decision"; width: 120px; }
+        }
+
+        // Table rows
+        ScrollView {
+            height: 380px;
+
+            VerticalLayout {
+                spacing: 6px;
+
+                for row in rows : HorizontalLayout {
+                    spacing: 8px;
+
+                    Text { text: row.id; width: 120px; }
+                    Text { text: row.path; width: 600px; }
+                    Text { text: row.decision; width: 120px; }
+                }
+            }
         }
     }
 }

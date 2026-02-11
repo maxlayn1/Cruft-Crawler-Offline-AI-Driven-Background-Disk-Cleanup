@@ -284,10 +284,10 @@
 //     Ok(())
 // }
 
- slint::include_modules!();
- 
+mod report;
+mod ui;
+
 fn main() -> anyhow::Result<()> {
-    let ui = AppWindow::new()?;
-    ui.run()?;
-    Ok(())
+    ui::run_ui()
 }
+
