@@ -19,8 +19,8 @@ pub struct ThrottleConfig {
     pub chunk_delay: Duration,
     pub gen_delay: Duration,
     pub max_tokens: usize,
-    //pub cpu_core: Option<usize>,                                                                    //none = don't pin, Some(n) = pin to core n
-    //pub nice_value: Option<i32>,                                                                    //none = don't set, Some(n) = set nice value
+    pub cpu_core: Option<usize>,                                                                    //none = don't pin, Some(n) = pin to core n
+    pub nice_value: Option<i32>,                                                                    //none = don't set, Some(n) = set nice value
 }
 
 impl Default for ThrottleConfig {
@@ -30,8 +30,8 @@ impl Default for ThrottleConfig {
             chunk_delay: Duration::from_millis(1250),                                                 //~2.5 min for 120 tokens
             gen_delay: Duration::from_millis(30000),                                                  //30s between generated tokens
             max_tokens: 20,
-            //cpu_core: Some(0),                                                                      //pin to core 0
-            //nice_value: Some(19),                                                                   //lowest priority
+            cpu_core: Some(None),                                                                     //keeping no pin and no NICEness for now
+            nice_value: Some(None),                                                                   
         }
     }
 }
@@ -41,18 +41,43 @@ pub struct LlmEngine {
     throttle_config: ThrottleConfig,
 }
 
-impl LlmEngine{
-    pub fn load_new_model(model_path: &str)-> anyhow::Result<Self>{
-        let backend = LlamaBackend::init()?;                                            //backend initialization
-        let model_params = LlamaModelParams::default();                             //loading model parameters
+impl LlmEngine {
+    pub fn load_new_model(model_path: &str) -> anyhow::Result<Self> {
+        Self::load_new_model_with_config(model_path, ThrottleConfig::default())
+    }
 
-        let model = LlamaModel::load_from_file(                                           //should be using Llama 3.2 3B Q8 for now
-            &backend,
-            model_path,
-            &model_params,
-        )?;
+    pub fn load_new_model_with_config(
+        model_path: &str,
+        throttle_config: ThrottleConfig,
+    ) -> anyhow::Result<Self> {
+        //apply CPU pinning and nice value if configured 
+        #[cfg(target_os = "linux")]
+        {
+            if let Some(core) = throttle_config.cpu_core {
+                unsafe {
+                    let mut cpu_set: libc::cpu_set_t = std::mem::zeroed();
+                    libc::CPU_SET(core, &mut cpu_set);
+                    libc::sched_setaffinity(0, std::mem::size_of::<libc::cpu_set_t>(), &cpu_set);
+                }
+            }
 
-        Ok(Self { backend, model })
+            if let Some(nice) = throttle_config.nice_value {
+                unsafe {
+                    libc::setpriority(libc::PRIO_PROCESS, 0, nice);
+                }
+            }
+        }
+
+        let backend = LlamaBackend::init()?;
+        let model_params = LlamaModelParams::default();
+
+        let model = LlamaModel::load_from_file(&backend, model_path, &model_params)?;
+
+        Ok(Self {
+            backend,
+            model,
+            throttle_config,
+        })
     }
 
     fn create_context(&self)-> anyhow::Result<LlamaContext<'_>>{
@@ -65,26 +90,8 @@ impl LlmEngine{
         Ok(ctx)
     }
 
-    fn tokenize_prompt(&self, prompt: &str) -> anyhow::Result<LlamaBatch<'_>>{
-        let tokens = self.model.str_to_token(prompt, AddBos::Always)?;          //tokenize the prompt
-
-        // --- tunable knobs ------------------------------------------------------------------
-        let chunk_size: usize = 1;                                                                    //tokens per chunk (increased to 16 from 4 for less overhead since fewer decode calls)
-        let chunk_delay = Duration::from_millis(1250);                                      //pause between chunks
-        let gen_delay = Duration::from_millis(30000);                                       //to throttle generation for reduced CPU load
-        let max_tokens = 20;                                                                     //since only expecting 'KEEP' or 'DELETE' no need for many tokens
-        // ------------------------------------------------------------------------------------
-        
-        let mut batch = LlamaBatch::new(64,1);                    //batching size for throttling
-        let total = tokens.len();
-        let chunks: Vec<&[llama_cpp_2::token::LlamaToken]> = tokens.chunks(chunk_size).collect();     //shit with chunking tokens for throttling/logits, dont ask
-        let last_index = (tokens.len() -1) as i32;
-
-        for(i, token) in tokens.into_iter().enumerate(){
-            batch.add(token, i as i32, &[0], i as i32 == last_index)?;
-        }
-
-        Ok(batch)
+    fn tokenize_prompt(&self, prompt: &str) -> anyhow::Result<Vec<llama_cpp_2::token::LlamaToken>> {
+    Ok(self.model.str_to_token(prompt, AddBos::Always)?)
     }
 
     pub fn infer_model(&self, prompt: &str)-> anyhow::Result<String>{
