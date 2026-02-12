@@ -70,11 +70,7 @@ impl LlmEngine{
 
         ctx.decode(&mut batch)?; 
 
-        // Set up sampler (greedy sampling - always picks most likely token)
-	    let mut sampler = LlamaSampler::chain_simple([
-	        LlamaSampler::dist(10), // seed
-	        LlamaSampler::greedy(),
-	    ]);
+        let mut sampler = LlamaSampler::greedy();                                       //swapped to most minimal possible sampler to reduce CPU load
             
         let mut decoder = encoding_rs::UTF_8.new_decoder();
         let mut response = String::new();
