@@ -13,9 +13,32 @@ use std::{any, fs};
 use std::time::Duration;
 use std::thread::sleep;
 
+///config for CPU optimization and throttling
+pub struct ThrottleConfig {
+    pub chunk_size: usize,
+    pub chunk_delay: Duration,
+    pub gen_delay: Duration,
+    pub max_tokens: usize,
+    //pub cpu_core: Option<usize>,                                                                    //none = don't pin, Some(n) = pin to core n
+    //pub nice_value: Option<i32>,                                                                    //none = don't set, Some(n) = set nice value
+}
+
+impl Default for ThrottleConfig {
+    fn default() -> Self {
+        Self {
+            chunk_size: 1,                                                                            //1 token per chunk = minimal CPU spikes
+            chunk_delay: Duration::from_millis(1250),                                                 //~2.5 min for 120 tokens
+            gen_delay: Duration::from_millis(30000),                                                  //30s between generated tokens
+            max_tokens: 20,
+            //cpu_core: Some(0),                                                                      //pin to core 0
+            //nice_value: Some(19),                                                                   //lowest priority
+        }
+    }
+}
 pub struct LlmEngine {
     backend: LlamaBackend,
     model:   LlamaModel,
+    throttle_config: ThrottleConfig,
 }
 
 impl LlmEngine{
@@ -72,10 +95,14 @@ impl LlmEngine{
 
         let mut sampler = LlamaSampler::greedy();                                       //swapped to most minimal possible sampler to reduce CPU load
             
-        let mut decoder = encoding_rs::UTF_8.new_decoder();
+        let mut decoder = encoding_rs::UTF_8.new_decoder();                                  //UTF-8 encoding crate should work here
         let mut response = String::new();
         let mut n_cur = batch.n_tokens();
         let max_tokens = 100;
+
+        // logits index: points to where logits were requested within the last decoded batch.
+        // after prompt: last token of the final chunk. During generation: always 0 (single-token batch).
+        //let mut logits_idx = last_chunk_len - 1;
 
         for _ in 0..max_tokens {
             let token = sampler.sample(&ctx, batch.n_tokens() - 1);
