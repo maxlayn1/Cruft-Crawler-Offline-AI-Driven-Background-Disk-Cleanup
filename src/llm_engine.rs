@@ -20,10 +20,10 @@ pub struct LlmEngine {
 
 impl LlmEngine{
     pub fn load_new_model(model_path: &str)-> anyhow::Result<Self>{
-        let backend = LlamaBackend::init()?;
-        let model_params = LlamaModelParams::default();
+        let backend = LlamaBackend::init()?;                                            //backend initialization
+        let model_params = LlamaModelParams::default();                             //loading model parameters
 
-        let model = LlamaModel::load_from_file(
+        let model = LlamaModel::load_from_file(                                           //should be using Llama 3.2 3B Q8 for now
             &backend,
             model_path,
             &model_params,
@@ -34,25 +34,27 @@ impl LlmEngine{
 
     fn create_context(&self)-> anyhow::Result<LlamaContext<'_>>{
         let ctx_params = LlamaContextParams::default()
-            .with_n_ctx(Some(NonZeroU32::new(128).unwrap()))   // context size reduced from 2056 to 128
+            .with_n_ctx(Some(NonZeroU32::new(128).unwrap()))                        //context size reduced from 2056 to 128
             .with_n_threads(1)
-            .with_n_threads_batch(1);   // setting it to one core, could potentially break with steady_state!
+            .with_n_threads_batch(1);                                                       //setting it to one core, could potentially break with steady_state!
 
         let ctx = self.model.new_context(&self.backend, ctx_params)?;
         Ok(ctx)
     }
 
     fn tokenize_prompt(&self, prompt: &str) -> anyhow::Result<LlamaBatch<'_>>{
-        let tokens = self.model.str_to_token(prompt, AddBos::Always)?;
+        let tokens = self.model.str_to_token(prompt, AddBos::Always)?;          //tokenize the prompt
 
-        // --- tunable knobs ---!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-        let chunk_size: usize = 1; // tokens per chunk (increased to 16 from 4 for less overhead since fewer decode calls)
-        let chunk_delay = Duration::from_millis(1250); // pause between chunks
-        let gen_delay = Duration::from_millis(30000); // to throttle generation for reduced CPU load
-        let max_tokens = 20; // since only expecting 'KEEP' or 'DELETE' no need for many tokens
-        // ----------------------
+        // --- tunable knobs ------------------------------------------------------------------
+        let chunk_size: usize = 1;                                                                    //tokens per chunk (increased to 16 from 4 for less overhead since fewer decode calls)
+        let chunk_delay = Duration::from_millis(1250);                                      //pause between chunks
+        let gen_delay = Duration::from_millis(30000);                                       //to throttle generation for reduced CPU load
+        let max_tokens = 20;                                                                     //since only expecting 'KEEP' or 'DELETE' no need for many tokens
+        // ------------------------------------------------------------------------------------
         
-        let mut batch = LlamaBatch::new(64,1);
+        let mut batch = LlamaBatch::new(64,1);                    //batching size for throttling
+        let total = tokens.len();
+        let chunks: Vec<&[llama_cpp_2::token::LlamaToken]> = tokens.chunks(chunk_size).collect();     //shit with chunking tokens for throttling/logits, dont ask
         let last_index = (tokens.len() -1) as i32;
 
         for(i, token) in tokens.into_iter().enumerate(){
