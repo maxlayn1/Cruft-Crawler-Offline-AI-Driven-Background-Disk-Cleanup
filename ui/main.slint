@@ -1,8 +1,11 @@
 import { Button, ScrollView } from "std-widgets.slint";
 
-export struct ReportRow {
-    id: string,
+// ✅ Step: new row struct for the UI table (includes Size + Reason)
+export struct RowData {
+    id: int,
     path: string,
+    size: string,
+    reason: string,
     decision: string,
 }
 
@@ -11,9 +14,14 @@ export component AppWindow inherits Window {
     height: 520px;
     title: "Cruft Crawler";
 
-    in property <string> status_text: "Idle";
-    in-out property <int> selected_index: -1;
-    in property <[ReportRow]> rows;
+    // ✅ Properties Rust will control
+    in property<int> progress_value: 0;
+    in property<string> status_text: "Idle";
+
+    in-out property<int> selected_index: -1;
+
+    // ✅ Step: model property for table rows
+    in property<[RowData]> rows: [];
 
     callback load_report();
     callback run_scan();
@@ -27,13 +35,39 @@ export component AppWindow inherits Window {
             font-size: 22px;
         }
 
+        // Status line
         HorizontalLayout {
             spacing: 12px;
 
             Text { text: "Status:"; }
-            Text { text: status_text; }
+            Text { text: root.status_text; }
+        }
 
-            Rectangle { width: 1px; height: 20px; }
+        // ✅ Custom Progress Bar bound to progress_value
+        Rectangle {
+            height: 8px;
+            width: 100%;
+            background: #3a3a3a;
+            border-radius: 4px;
+
+            Rectangle {
+                height: parent.height;
+                border-radius: 4px;
+                background: #66ff99;
+
+                width: parent.width * root.progress_value / 100;
+            }
+        }
+
+        // Progress text bound to status_text
+        Text {
+            text: root.status_text;
+            font-size: 12px;
+        }
+
+        // Buttons row
+        HorizontalLayout {
+            spacing: 12px;
 
             Button {
                 text: "Load Report (TSV)";
@@ -52,9 +86,11 @@ export component AppWindow inherits Window {
         HorizontalLayout {
             spacing: 8px;
 
-            Text { text: "ID"; width: 120px; }
-            Text { text: "Path"; width: 600px; }
-            Text { text: "Decision"; width: 120px; }
+            Text { text: "ID"; width: 90px; }
+            Text { text: "Path"; width: 430px; }
+            Text { text: "Size"; width: 110px; }
+            Text { text: "Reason"; width: 140px; }
+            Text { text: "Decision"; width: 110px; }
         }
 
         // Table rows
@@ -64,6 +100,7 @@ export component AppWindow inherits Window {
             VerticalLayout {
                 spacing: 6px;
 
+                // ✅ Step: bind loop to rows model
                 for row[i] in rows : Rectangle {
                     height: 26px;
                     background: (i == selected_index) ? #303030 : #00000000;
@@ -75,12 +112,14 @@ export component AppWindow inherits Window {
                     HorizontalLayout {
                         spacing: 8px;
 
-                        Text { text: row.id; width: 120px; }
-                        Text { text: row.path; width: 600px; }
+                        Text { text: row.id; width: 90px; }
+                        Text { text: row.path; width: 430px; }
+                        Text { text: row.size; width: 110px; }
+                        Text { text: row.reason; width: 140px; }
 
                         Text {
                             text: row.decision;
-                            width: 120px;
+                            width: 110px;
                             color: row.decision == "DELETE" ? #ff6b6b
                                  : row.decision == "KEEP"   ? #66ff99
                                  : #ffffff;
