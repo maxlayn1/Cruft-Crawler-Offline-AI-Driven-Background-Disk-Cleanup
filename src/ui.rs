@@ -107,6 +107,7 @@ pub fn run_ui() -> Result<()> {
                             let ui_weak = ui_weak_thread.clone();
                             move || {
                                 if let Some(ui) = ui_weak.upgrade() {
+                                    // ✅ Safe/compatible with: in property<[RowData]> rows;
                                     ui.set_rows(slint::ModelRc::new(slint::VecModel::from(slint_rows)));
                                     ui.set_status_text(format!("Loaded {count} rows ✅").into());
                                 }

@@ -1,6 +1,5 @@
 import { Button, ScrollView } from "std-widgets.slint";
 
-// ✅ Step: new row struct for the UI table (includes Size + Reason)
 export struct RowData {
     id: int,
     path: string,
@@ -14,116 +13,255 @@ export component AppWindow inherits Window {
     height: 520px;
     title: "Cruft Crawler";
 
-    // ✅ Properties Rust will control
+    // Theme base
+    background: #121212;
+
+    // State
     in property<int> progress_value: 0;
     in property<string> status_text: "Idle";
 
     in-out property<int> selected_index: -1;
+    in property<[RowData]> rows;
 
-    // ✅ Step: model property for table rows
-    in property<[RowData]> rows: [];
+    in-out property<bool> in_detail_view: false;
+    in-out property<string> selected_path: "";
+    in-out property<string> selected_size: "";
+    in-out property<string> selected_reason: "";
 
     callback load_report();
     callback run_scan();
+    callback back_to_list();
+    callback set_decision_for_selected(string);
 
     VerticalLayout {
-        padding: 16px;
-        spacing: 12px;
+        padding: 18px;
+        spacing: 14px;
 
-        Text {
-            text: "Cruft Crawler";
-            font-size: 22px;
-        }
-
-        // Status line
-        HorizontalLayout {
-            spacing: 12px;
-
-            Text { text: "Status:"; }
-            Text { text: root.status_text; }
-        }
-
-        // ✅ Custom Progress Bar bound to progress_value
+        // Outer shell panel (slightly lighter than window)
         Rectangle {
-            height: 8px;
             width: 100%;
-            background: #3a3a3a;
-            border-radius: 4px;
+            height: 100%;
+            border-radius: 12px;
+            background: #1a1a1a;
 
+            // =============================
+            // LIST VIEW
+            // =============================
             Rectangle {
-                height: parent.height;
-                border-radius: 4px;
-                background: #66ff99;
+                width: 100%;
+                height: 100%;
+                visible: !root.in_detail_view;
+                background: #1a1a1a;
 
-                width: parent.width * root.progress_value / 100;
-            }
-        }
+                VerticalLayout {
+                    padding: 16px;
+                    spacing: 12px;
 
-        // Progress text bound to status_text
-        Text {
-            text: root.status_text;
-            font-size: 12px;
-        }
-
-        // Buttons row
-        HorizontalLayout {
-            spacing: 12px;
-
-            Button {
-                text: "Load Report (TSV)";
-                clicked => { load_report(); }
-            }
-
-            Button {
-                text: "Run Scan (later)";
-                clicked => { run_scan(); }
-            }
-        }
-
-        Rectangle { height: 1px; }
-
-        // Table header
-        HorizontalLayout {
-            spacing: 8px;
-
-            Text { text: "ID"; width: 90px; }
-            Text { text: "Path"; width: 430px; }
-            Text { text: "Size"; width: 110px; }
-            Text { text: "Reason"; width: 140px; }
-            Text { text: "Decision"; width: 110px; }
-        }
-
-        // Table rows
-        ScrollView {
-            height: 380px;
-
-            VerticalLayout {
-                spacing: 6px;
-
-                // ✅ Step: bind loop to rows model
-                for row[i] in rows : Rectangle {
-                    height: 26px;
-                    background: (i == selected_index) ? #303030 : #00000000;
-
-                    TouchArea {
-                        clicked => { selected_index = i; }
+                    // Header
+                    Text {
+                        text: "Cruft Crawler";
+                        font-size: 24px;
+                        color: #ffffff;
                     }
 
+                    // Status row
+                    HorizontalLayout {
+                        spacing: 10px;
+
+                        Text { text: "Status:"; color: #a8a8a8; }
+                        Text { text: root.status_text; color: #4dd0ff; }
+                    }
+
+                    // Progress bar
+                    Rectangle {
+                        height: 10px;
+                        width: 100%;
+                        background: #2a2a2a;
+                        border-radius: 6px;
+
+                        Rectangle {
+                            height: parent.height;
+                            border-radius: 6px;
+                            background: #4dd0ff;
+                            width: parent.width * root.progress_value / 100;
+                        }
+                    }
+
+                    // Buttons
+                    HorizontalLayout {
+                        spacing: 12px;
+
+                        Button { text: "Load Report"; clicked => { load_report(); } }
+                        Button { text: "Run Scan"; clicked => { run_scan(); } }
+                    }
+
+                    // Divider
+                    Rectangle { height: 1px; background: #2f2f2f; }
+
+                    // Table header
                     HorizontalLayout {
                         spacing: 8px;
 
-                        Text { text: row.id; width: 90px; }
-                        Text { text: row.path; width: 430px; }
-                        Text { text: row.size; width: 110px; }
-                        Text { text: row.reason; width: 140px; }
+                        Text { text: "ID"; width: 80px; color: #bcbcbc; }
+                        Text { text: "Path"; width: 420px; color: #bcbcbc; }
+                        Text { text: "Size"; width: 100px; color: #bcbcbc; }
+                        Text { text: "Option"; width: 100px; color: #bcbcbc; }
+                    }
 
-                        Text {
-                            text: row.decision;
-                            width: 110px;
-                            color: row.decision == "DELETE" ? #ff6b6b
-                                 : row.decision == "KEEP"   ? #66ff99
-                                 : #ffffff;
+                    // Table rows (scroll)
+                    ScrollView {
+                        height: 320px;
+
+                        VerticalLayout {
+                            spacing: 4px;
+
+                            for row[i] in rows : Rectangle {
+                                height: 34px;
+                                border-radius: 8px;
+
+                                // ✅ subtle row striping + selection highlight
+                                background:
+                                    i == selected_index ? #2a3e57 :
+                                    (Math.mod(i, 2) == 0 ? #202020 : #1d1d1d);
+
+                                // optional thin outline for selected row
+                                Rectangle {
+                                    visible: i == selected_index;
+                                    height: parent.height;
+                                    width: parent.width;
+                                    border-radius: 8px;
+                                    background: #00000000;
+                                    border-width: 1px;
+                                    border-color: #4dd0ff;
+                                }
+
+                                TouchArea {
+                                    clicked => {
+                                        selected_index = i;
+                                        selected_path = row.path;
+                                        selected_size = row.size;
+                                        selected_reason = row.reason;
+                                        in_detail_view = true;
+                                    }
+                                }
+
+                                HorizontalLayout {
+                                    padding-left: 10px;
+                                    spacing: 8px;
+
+                                    Text { text: row.id; width: 80px; color: #ffffff; }
+                                    Text { text: row.path; width: 420px; color: #e0e0e0; }
+                                    Text { text: row.size; width: 100px; color: #cfcfcf; }
+
+                                    // ✅ colored option text
+                                    Text {
+                                        text: row.decision;
+                                        width: 100px;
+                                        color:
+                                            row.decision == "DELETE" ? #ff6b6b :
+                                            row.decision == "KEEP" ? #66ff99 :
+                                            row.decision == "IGNORE" ? #ffd166 :
+                                            row.decision == "PENDING" ? #4dd0ff :
+                                            #ffffff;
+                                    }
+                                }
+                            }
                         }
+                    }
+                }
+            }
+
+            // =============================
+            // DETAIL VIEW
+            // =============================
+            Rectangle {
+                width: 100%;
+                height: 100%;
+                visible: root.in_detail_view;
+                background: #1a1a1a;
+
+                ScrollView {
+                    height: 100%;
+
+                    VerticalLayout {
+                        padding: 18px;
+                        spacing: 14px;
+
+                        HorizontalLayout {
+                            spacing: 12px;
+
+                            Button {
+                                text: "← Back";
+                                clicked => {
+                                    in_detail_view = false;
+                                    back_to_list();
+                                }
+                            }
+
+                            Text {
+                                text: "File Details";
+                                font-size: 20px;
+                                color: #ffffff;
+                            }
+                        }
+
+                        Rectangle { height: 1px; background: #2f2f2f; }
+
+                        // Path section
+                        Text { text: "Path"; color: #bcbcbc; }
+
+                        Rectangle {
+                            width: 100%;
+                            border-radius: 10px;
+                            background: #222222;
+                            padding: 12px;
+
+                            Text {
+                                text: root.selected_path;
+                                wrap: word-wrap;
+                                color: #ffffff;
+                            }
+                        }
+
+                        // Size section
+                        HorizontalLayout {
+                            spacing: 10px;
+
+                            Text { text: "Size:"; color: #bcbcbc; }
+                            Text { text: root.selected_size; color: #ffffff; }
+                        }
+
+                        Rectangle { height: 1px; background: #2f2f2f; }
+
+                        // Reason section
+                        Text { text: "Reason"; font-size: 16px; color: #ffffff; }
+
+                        Rectangle {
+                            width: 100%;
+                            height: 160px;
+                            border-radius: 10px;
+                            background: #222222;
+                            padding: 12px;
+
+                            Text {
+                                text: root.selected_reason;
+                                wrap: word-wrap;
+                                color: #d9d9d9;
+                            }
+                        }
+
+                        Text { text: "Choose Option"; font-size: 16px; color: #ffffff; }
+
+                        // Buttons (no background property — safe for your Button)
+                        HorizontalLayout {
+                            spacing: 14px;
+
+                            Button { text: "KEEP"; clicked => { set_decision_for_selected("KEEP"); } }
+                            Button { text: "DELETE"; clicked => { set_decision_for_selected("DELETE"); } }
+                            Button { text: "IGNORE"; clicked => { set_decision_for_selected("IGNORE"); } }
+                        }
+
+                        Rectangle { height: 14px; background: #00000000; }
                     }
                 }
             }
