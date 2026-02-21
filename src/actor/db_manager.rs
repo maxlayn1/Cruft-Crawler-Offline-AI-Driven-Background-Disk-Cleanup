@@ -31,19 +31,16 @@ async fn internal_behavior<A: SteadyActor>(mut actor: A,
     let ctr: i32 = 0;
 
     while actor.is_running(|| crawler_to_db_rx.is_closed_and_empty()) {
-
+        await_for_all!(actor.wait_avail(&mut file_handler_to_db_rx, 1), actor.wait_avail(&mut crawler_to_db_rx, BATCH_SIZE));
         //Recieving data from ui actor
-	    actor.wait_avail(&mut file_handler_to_db_rx, 1).await;
-        let recieved = actor.try_take(&mut file_handler_to_db_rx);
-	    let message = recieved.expect("Expected a string");
+	    //actor.wait_avail(&mut file_handler_to_db_rx, 1).await;
+        let recieved = actor.try_take(&mut file_handler_to_db_rx).expect("expected a string");
 
         //Recieving from crawler actor
-	    actor.wait_avail(&mut crawler_to_db_rx, BATCH_SIZE).await;
-	    let recieved = actor.try_take(&mut crawler_to_db_rx);
-
-	    let msg = recieved.expect("expected FileMeta Struct (db_actor)");
-	    let _ = db_add(ctr, msg.clone(), &db);
-	    msg.meta_print();
+	    //actor.wait_avail(&mut crawler_to_db_rx, BATCH_SIZE).await;
+	    let recieved = actor.try_take(&mut crawler_to_db_rx).expect("expected FileMeta Struct (db_actor)");
+	    let _ = db_add(ctr, recieved.clone(), &db);
+	    recieved.meta_print();
 	}
     
   Ok(())

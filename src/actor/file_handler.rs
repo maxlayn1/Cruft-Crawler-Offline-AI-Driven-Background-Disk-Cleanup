@@ -30,14 +30,14 @@ async fn internal_behavior<A: SteadyActor>(mut actor: A, ui_to_file_handler_rx: 
 
     
     while actor.is_running(|| ui_to_file_handler_rx.is_closed_and_empty() || file_handler_to_db_tx.is_empty()) {
-
+		await_for_all!(actor.wait_avail(&mut ui_to_file_handler_rx, 1), actor.wait_vacant(&mut file_handler_to_db_tx, 1));
         //Recieving data from ui actor
-	    actor.wait_avail(&mut ui_to_file_handler_rx, 1).await;
+	    //actor.wait_avail(&mut ui_to_file_handler_rx, 1).await;
         let recieved = actor.try_take(&mut ui_to_file_handler_rx);
 	    let message = recieved.expect("Expected a string");
 
         //Sending data to data base actor
-		actor.wait_vacant(&mut file_handler_to_db_tx, 1);
+		//actor.wait_vacant(&mut file_handler_to_db_tx, 1);
 		let file_handler_to_db_message = "Hello";
 		actor.try_send(&mut file_handler_to_db_tx , file_handler_to_db_message.to_string());
 

@@ -52,18 +52,17 @@ async fn internal_behavior<A: SteadyActor>(mut actor: A, crawler_to_ai_model_rx:
     
     while actor.is_running(|| crawler_to_ai_model_rx.is_closed_and_empty() || ai_model_to_ui_tx.mark_closed()) {
 		
-		
+		await_for_all!(actor.wait_avail(&mut crawler_to_ai_model_rx, 1), actor.wait_vacant(&mut ai_model_to_ui_tx, 1));
+
 		let resp1 = engine.infer_model(&prompt1)?;
+		
 	    //Reciecing data from crawler actor
-	    actor.wait_avail(&mut crawler_to_ai_model_rx, 1).await;
-        let recieved = actor.try_take(&mut crawler_to_ai_model_rx);
-	    let message = recieved.expect("Expected a string");
-		
+	    //actor.wait_avail(&mut crawler_to_ai_model_rx, 1).await;
+        let recieved = actor.try_take(&mut crawler_to_ai_model_rx).expect("ai actor failed to take from crawler");
+
 		//Sending data to ui actor
-		actor.wait_vacant(&mut ai_model_to_ui_tx, 1);
+		//actor.wait_vacant(&mut ai_model_to_ui_tx, 1).await;
 		let ai_to_ui_message = "Hello";
-		actor.try_send(&mut ai_model_to_ui_tx , ai_to_ui_message.to_string());
-		
     } 
 
 	return Ok(());

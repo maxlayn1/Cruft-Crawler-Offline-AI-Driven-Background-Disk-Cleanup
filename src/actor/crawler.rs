@@ -98,17 +98,38 @@ async fn internal_behavior<A: SteadyActor>(mut actor: A, crawler_tx: SteadyTx<Fi
     let metas: Vec<FileMeta> = visit_dir(path1, &state)?;
     
     while actor.is_running(|| crawler_tx.mark_closed()) {
+        await_for_all!(actor.wait_vacant(&mut crawler_to_ai_model_tx, 1), actor.wait_vacant(&mut crawler_tx, 1));
 
         //Sending data to ai actor
-        actor.wait_vacant(&mut crawler_to_ai_model_tx, 1).await;
-        let message = "Hello".to_string();
-        actor.try_send(&mut crawler_to_ai_model_tx, message);
+        //actor.wait_vacant(&mut crawler_to_ai_model_tx, 1).await;
+        let message2 = "Hello".to_string();
+    
+        match actor.try_send(&mut crawler_to_ai_model_tx, message2){
+            SendOutcome::Success=>{
+                continue;
+            }
+            SendOutcome::Blocked(_)=>{
+                println!("Channel is blocked");
+                continue;
+            }
+            
+        }
         
         //sending data to database actor
         for m in &metas {
             actor.wait_vacant(&mut crawler_tx, 1).await; 
             let message = m.clone();
-            actor.try_send(&mut crawler_tx, message).expect("couldn't send to DB");
+
+            match actor.try_send(&mut crawler_tx, message){
+                SendOutcome::Success =>{
+                    println!("Crawler sent to DB");
+                }
+                SendOutcome::Blocked(_) => {
+                    println!("Channel is blocked");
+                    continue;
+                }
+            }
+            //actor.try_send(&mut crawler_tx, message).expect("couldn't send to DB");
 	    }
         
         //actor.request_shutdown().await; //comment out this line to make the program have an infinite loop.
@@ -182,10 +203,10 @@ pub fn visit_dir(dir: &Path,
 		}
 
                 metas.push(FileMeta {
-		    rel_path,
-		    abs_path,
+		            rel_path,
+		            abs_path,
                     file_name,
-		    hash, 
+		            hash, 
                     is_file,
                     size,
                     modified, 

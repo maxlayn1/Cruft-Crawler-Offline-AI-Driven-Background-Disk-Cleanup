@@ -47,7 +47,6 @@ impl LlmEngine{
         for(i, token) in tokens.into_iter().enumerate(){
             batch.add(token, i as i32, &[0], i as i32 == last_index)?;
         }
-
         Ok(batch)
     }
 
@@ -80,7 +79,7 @@ impl LlmEngine{
 
             // Simple debug: print as you go
             if let Ok(text) = std::str::from_utf8(&bytes) {
-                print!("{text}");
+                //print!("{text}");
                 response.push_str(text);
             }
 
