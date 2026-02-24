@@ -44,7 +44,9 @@ impl LlmEngine{
 
     fn create_context(&self)-> anyhow::Result<LlamaContext<'_>>{
         let ctx_params = LlamaContextParams::default()
-            .with_n_ctx(Some(NonZeroU32::new(256).unwrap()));                                       //reduced context size to 
+            .with_n_ctx(Some(NonZeroU32::new(256).unwrap()))                                       //IT CANNOT HANDLE 128 CONTEXT SIZE
+            .with_n_threads(1)
+            .with_n_threads_batch(1);                                                                      //attempt to keep it to one thread
 
         let ctx = self.model.new_context(&self.backend, ctx_params)?;
         Ok(ctx)
