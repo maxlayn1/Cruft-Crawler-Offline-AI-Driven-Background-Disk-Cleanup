@@ -11,6 +11,9 @@ use std::io::Write;
 use std::num::NonZeroU32;
 use std::{any, fs};
 
+use std::thread::sleep;
+use std::time::Duration;
+
 pub struct LlmEngine {
     backend: LlamaBackend,
     model:   LlamaModel,
@@ -26,6 +29,15 @@ impl LlmEngine{
             model_path,
             &model_params,
         )?;
+
+        #[cfg(target_os = "linux")]
+        {
+            unsafe {
+                let mut cpu_set: libc::cpu_set_t = std::mem::zeroed();
+                libc::CPU_SET(0, &mut cpu_set);         //pin to core 0, seems to overfill to cores 1, and 2
+                libc::sched_setaffinity(0, std::mem::size_of::<libc::cpu_set_t>(), &cpu_set);
+            }
+        }
 
         Ok(Self { backend, model })
     }
