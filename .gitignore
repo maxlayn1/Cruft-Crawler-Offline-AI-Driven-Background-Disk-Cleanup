@@ -24,3 +24,5 @@ Cargo.lock
 
 src/models
 # ignore the whole models folder since you can't push the model files to github
+LLM_responses.txt
+# no need to push LLM responses file
