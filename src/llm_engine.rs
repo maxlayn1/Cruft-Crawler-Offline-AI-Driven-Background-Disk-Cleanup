@@ -10,88 +10,45 @@ use llama_cpp_2::context::LlamaContext;
 use std::io::Write;
 use std::num::NonZeroU32;
 use std::{any, fs};
-use std::time::Duration;
-use std::thread::sleep;
 
-///config for CPU optimization and throttling
-pub struct ThrottleConfig {
-    pub chunk_size: usize,
-    pub chunk_delay: Duration,
-    pub gen_delay: Duration,
-    pub max_tokens: usize,
-    pub cpu_core: Option<usize>,                                                                    //none = don't pin, Some(n) = pin to core n
-    pub nice_value: Option<i32>,                                                                    //none = don't set, Some(n) = set nice value
-}
-
-impl Default for ThrottleConfig {
-    fn default() -> Self {
-        Self {
-            chunk_size: 1,                                                                            //1 token per chunk = minimal CPU spikes
-            chunk_delay: Duration::from_millis(1250),                                                 //~2.5 min for 120 tokens
-            gen_delay: Duration::from_millis(30000),                                                  //30s between generated tokens
-            max_tokens: 20,
-            cpu_core: Some(None),                                                                     //keeping no pin and no NICEness for now
-            nice_value: Some(None),                                                                   
-        }
-    }
-}
 pub struct LlmEngine {
     backend: LlamaBackend,
     model:   LlamaModel,
-    throttle_config: ThrottleConfig,
 }
 
-impl LlmEngine {
-    pub fn load_new_model(model_path: &str) -> anyhow::Result<Self> {
-        Self::load_new_model_with_config(model_path, ThrottleConfig::default())
-    }
-
-    pub fn load_new_model_with_config(
-        model_path: &str,
-        throttle_config: ThrottleConfig,
-    ) -> anyhow::Result<Self> {
-        //apply CPU pinning and nice value if configured 
-        #[cfg(target_os = "linux")]
-        {
-            if let Some(core) = throttle_config.cpu_core {
-                unsafe {
-                    let mut cpu_set: libc::cpu_set_t = std::mem::zeroed();
-                    libc::CPU_SET(core, &mut cpu_set);
-                    libc::sched_setaffinity(0, std::mem::size_of::<libc::cpu_set_t>(), &cpu_set);
-                }
-            }
-
-            if let Some(nice) = throttle_config.nice_value {
-                unsafe {
-                    libc::setpriority(libc::PRIO_PROCESS, 0, nice);
-                }
-            }
-        }
-
+impl LlmEngine{
+    pub fn load_new_model(model_path: &str)-> anyhow::Result<Self>{
         let backend = LlamaBackend::init()?;
         let model_params = LlamaModelParams::default();
 
-        let model = LlamaModel::load_from_file(&backend, model_path, &model_params)?;
+        let model = LlamaModel::load_from_file(
+            &backend,
+            model_path,
+            &model_params,
+        )?;
 
-        Ok(Self {
-            backend,
-            model,
-            throttle_config,
-        })
+        Ok(Self { backend, model })
     }
 
     fn create_context(&self)-> anyhow::Result<LlamaContext<'_>>{
         let ctx_params = LlamaContextParams::default()
-            .with_n_ctx(Some(NonZeroU32::new(128).unwrap()))                        //context size reduced from 2056 to 128
-            .with_n_threads(1)
-            .with_n_threads_batch(1);                                                       //setting it to one core, could potentially break with steady_state!
+            .with_n_ctx(Some(NonZeroU32::new(256).unwrap()));                                       //reduced context size to 
 
         let ctx = self.model.new_context(&self.backend, ctx_params)?;
         Ok(ctx)
     }
 
-    fn tokenize_prompt(&self, prompt: &str) -> anyhow::Result<Vec<llama_cpp_2::token::LlamaToken>> {
-    Ok(self.model.str_to_token(prompt, AddBos::Always)?)
+    fn tokenize_prompt(&self, prompt: &str) -> anyhow::Result<LlamaBatch<'_>>{
+        let tokens = self.model.str_to_token(prompt, AddBos::Always)?;
+
+        let mut batch = LlamaBatch::new(512,1);
+        let last_index = (tokens.len() -1) as i32;
+
+        for(i, token) in tokens.into_iter().enumerate(){
+            batch.add(token, i as i32, &[0], i as i32 == last_index)?;
+        }
+
+        Ok(batch)
     }
 
     pub fn infer_model(&self, prompt: &str)-> anyhow::Result<String>{
@@ -100,16 +57,16 @@ impl LlmEngine {
 
         ctx.decode(&mut batch)?; 
 
-        let mut sampler = LlamaSampler::greedy();                                       //swapped to most minimal possible sampler to reduce CPU load
+        // Set up sampler (greedy sampling - always picks most likely token)
+	    let mut sampler = LlamaSampler::chain_simple([
+	        LlamaSampler::dist(10), // seed
+	        LlamaSampler::greedy(),
+	    ]);
             
-        let mut decoder = encoding_rs::UTF_8.new_decoder();                                  //UTF-8 encoding crate should work here
+        let mut decoder = encoding_rs::UTF_8.new_decoder();
         let mut response = String::new();
         let mut n_cur = batch.n_tokens();
         let max_tokens = 100;
-
-        // logits index: points to where logits were requested within the last decoded batch.
-        // after prompt: last token of the final chunk. During generation: always 0 (single-token batch).
-        //let mut logits_idx = last_chunk_len - 1;
 
         for _ in 0..max_tokens {
             let token = sampler.sample(&ctx, batch.n_tokens() - 1);
