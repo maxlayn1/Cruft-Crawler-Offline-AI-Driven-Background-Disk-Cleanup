@@ -31,17 +31,29 @@ async fn internal_behavior<A: SteadyActor>(mut actor: A,
     let ctr: i32 = 0;
 
     while actor.is_running(|| crawler_to_db_rx.is_closed_and_empty()) {
-        await_for_all!(actor.wait_avail(&mut file_handler_to_db_rx, 1), actor.wait_avail(&mut crawler_to_db_rx, BATCH_SIZE));
-        //Recieving data from ui actor
-	    //actor.wait_avail(&mut file_handler_to_db_rx, 1).await;
-        let recieved = actor.try_take(&mut file_handler_to_db_rx).expect("expected a string");
-
-        //Recieving from crawler actor
-	    //actor.wait_avail(&mut crawler_to_db_rx, BATCH_SIZE).await;
-	    let recieved = actor.try_take(&mut crawler_to_db_rx).expect("expected FileMeta Struct (db_actor)");
-	    let _ = db_add(ctr, recieved.clone(), &db);
-	    recieved.meta_print();
-	}
+        // 1) Wait until there is at least one FileMeta from the crawler
+        actor.wait_avail(&mut crawler_to_db_rx, BATCH_SIZE).await;
+    
+        // 2) Optionally read from file_handler_to_db_rx if something is there,
+        //    but don't require it to proceed.
+        if let Some(msg) = actor.try_take(&mut file_handler_to_db_rx) {
+            println!("DB got String from file handler/UI: {}", msg);
+        }
+    
+        // 3) Drain up to BATCH_SIZE items from crawler_to_db_rx
+        for _ in 0..BATCH_SIZE {
+            match actor.try_take(&mut crawler_to_db_rx) {
+                Some(file_meta) => {
+                    let _ = db_add(ctr, file_meta.clone(), &db);
+                    file_meta.meta_print();
+                }
+                None => {
+                    // nothing more to read right now
+                    break;
+                }
+            }
+        }
+    }
     
   Ok(())
 }

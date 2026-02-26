@@ -91,7 +91,7 @@ async fn internal_behavior<A: SteadyActor>(mut actor: A, crawler_tx: SteadyTx<Fi
     let mut crawler_tx = crawler_tx.lock().await;
     let mut crawler_to_ai_model_tx = crawler_to_ai_model_tx.lock().await;
 
-    let path1 = Path::new("./src/test_directory/");
+    let path1 = Path::new("./src/");
 
     // TODO: change value of state inside this function before pushing metadata
     // NOTE: state passed in as mutable reference  &StateGuard<'_, CrawlerState>
@@ -106,27 +106,24 @@ async fn internal_behavior<A: SteadyActor>(mut actor: A, crawler_tx: SteadyTx<Fi
     
         match actor.try_send(&mut crawler_to_ai_model_tx, message2){
             SendOutcome::Success=>{
-                continue;
             }
             SendOutcome::Blocked(_)=>{
-                println!("Channel is blocked");
-                continue;
+                eprintln!("CrawlerChannel is blocked");
             }
             
         }
         
         //sending data to database actor
         for m in &metas {
-            actor.wait_vacant(&mut crawler_tx, 1).await; 
+            //actor.wait_vacant(&mut crawler_tx, 1).await; 
             let message = m.clone();
 
             match actor.try_send(&mut crawler_tx, message){
                 SendOutcome::Success =>{
-                    println!("Crawler sent to DB");
+                    eprintln!("Crawler sent to DB");
                 }
                 SendOutcome::Blocked(_) => {
-                    println!("Channel is blocked");
-                    continue;
+                    eprintln!("Channel is blocked");
                 }
             }
             //actor.try_send(&mut crawler_tx, message).expect("couldn't send to DB");
@@ -199,22 +196,30 @@ pub fn visit_dir(dir: &Path,
 		let mut hash: String = String::new();
 
 		if is_file {
-		hash = get_file_hash(abs_path.clone()).expect("didn't get hash value");
-		}
-
-                metas.push(FileMeta {
-		            rel_path,
-		            abs_path,
-                    file_name,
-		            hash, 
-                    is_file,
-                    size,
-                    modified, 
-                    created,
-                    readonly,
-                });
+            match get_file_hash(abs_path.clone()) {
+                Ok(h) => {
+                    hash = h;
+                }
+                Err(e) => {
+                    eprintln!("Skipping locked/unreadable file {:?}: {}", abs_path, e);
+                    continue; // skip this entry and move on
+                }
             }
-            Err(e) => {
+        }
+
+        metas.push(FileMeta {
+		        rel_path,
+		        abs_path,
+                file_name,
+		        hash, 
+                is_file,
+                size,
+                modified, 
+                created,
+                readonly,
+            });
+        }
+        Err(e) => {
 		// TODO: log errors here
                 eprintln!("warning: cannot stat {}: {}", file_name, e);
             }

@@ -16,7 +16,7 @@ use std::{any, fs};
 
 use crate::actor::crawler;
 
-const MODEL_FILE_PATH: &str  = "./src/models/Llama-3.2-3B-Instruct-UD-Q4_K_XL.gguf";
+const MODEL_FILE_PATH: &str  = "./src/models/llama-3.2-3b-instruct-q8_0.gguf";
 const PROMPT_FILE_PATH: &str = "./src/prompt.txt";
 
 // run function 
