@@ -19,3 +19,7 @@ anyhow = "1.0.100"
 llama-cpp-2 = "0.1.124"
 encoding_rs = "0.8.35"
 libc = "0.2"
+clap = "4.5.60"
+tokio = { version = "1", features = ["rt", "rt-multi-thread"] }
+ratatui = "0.30.0"
+crossterm = "0.29.0"
