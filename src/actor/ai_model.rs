@@ -8,7 +8,7 @@ use llama_cpp_2::llama_backend::LlamaBackend;
 use llama_cpp_2::llama_batch::LlamaBatch;
 use llama_cpp_2::model::params::LlamaModelParams;
 use llama_cpp_2::model::LlamaModel;
-use llama_cpp_2::model::{AddBos, Special};
+use llama_cpp_2::model::AddBos;
 use llama_cpp_2::sampling::LlamaSampler;
 use std::io::Write;
 use std::num::NonZeroU32;
@@ -16,7 +16,7 @@ use std::{any, fs};
 
 use crate::actor::crawler;
 
-const MODEL_FILE_PATH: &str  = "./src/models/llama-3.2-3b-instruct-q8_0.gguf";
+const MODEL_FILE_PATH: &str  = "./src/models/Llama-3.2-3B-Instruct-UD-Q4_K_XL.gguf";
 const PROMPT_FILE_PATH: &str = "./src/prompt.txt";
 
 // run function 
@@ -47,7 +47,7 @@ async fn internal_behavior<A: SteadyActor>(mut actor: A, crawler_to_ai_model_rx:
 
     let prompt1 = fs::read_to_string(PROMPT_FILE_PATH)?;
     let resp1 = engine.infer_model(&prompt1)?;
-    println!("Response 1:\n{}", resp1);
+    //println!("Response 1:\n{}", resp1);
    
     
     while actor.is_running(|| crawler_to_ai_model_rx.is_closed_and_empty() || ai_model_to_ui_tx.mark_closed()) {
@@ -57,8 +57,14 @@ async fn internal_behavior<A: SteadyActor>(mut actor: A, crawler_to_ai_model_rx:
 		let resp1 = engine.infer_model(&prompt1)?;
 		
 	    //Reciecing data from crawler actor
-	    //actor.wait_avail(&mut crawler_to_ai_model_rx, 1).await;
-        let recieved = actor.try_take(&mut crawler_to_ai_model_rx).expect("ai actor failed to take from crawler");
+        let received = match actor.try_take(&mut crawler_to_ai_model_rx) {
+			Some(msg) => msg,
+			None => {
+				// channel closed or no message despite wait; decide what to do
+				// e.g. just skip this loop iteration:
+				continue;
+			}
+		};
 
 		//Sending data to ui actor
 		//actor.wait_vacant(&mut ai_model_to_ui_tx, 1).await;

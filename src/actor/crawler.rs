@@ -67,8 +67,12 @@ impl FileMeta {
 
 
 // run function 
-pub async fn run(actor: SteadyActorShadow, crawler_tx: SteadyTx<FileMeta>, crawler_to_model_tx : SteadyTx<String>,
-                 state: SteadyState<CrawlerState>) -> Result<(),Box<dyn Error>> {
+pub async fn run(
+    actor: SteadyActorShadow,
+    crawler_tx: SteadyTx<FileMeta>,
+    crawler_to_model_tx: SteadyTx<String>,  // ← was SteadyTx<String>
+    state: SteadyState<CrawlerState>,
+) -> Result<(), Box<dyn std::error::Error>> {
 
     let actor = actor.into_spotlight([], [&crawler_tx, &crawler_to_model_tx]);
 
@@ -80,9 +84,13 @@ pub async fn run(actor: SteadyActorShadow, crawler_tx: SteadyTx<FileMeta>, crawl
 }
 
 
-// Internal behaviour for the actor
-async fn internal_behavior<A: SteadyActor>(mut actor: A, crawler_tx: SteadyTx<FileMeta>, crawler_to_ai_model_tx : SteadyTx<String>,
-                                           state: SteadyState<CrawlerState>) -> Result<(),Box<dyn Error>> {
+/// Change internal_behavior signature to match:
+async fn internal_behavior<A: SteadyActor>(
+    mut actor: A,
+    crawler_tx: SteadyTx<FileMeta>,
+    crawler_to_ai_model_tx: SteadyTx<String>,  
+    state: SteadyState<CrawlerState>,
+) -> Result<(), Box<dyn std::error::Error>> {
 
     // lock state
     let mut state = state.lock(|| CrawlerState{abs_path: PathBuf::new(),
@@ -91,7 +99,7 @@ async fn internal_behavior<A: SteadyActor>(mut actor: A, crawler_tx: SteadyTx<Fi
     let mut crawler_tx = crawler_tx.lock().await;
     let mut crawler_to_ai_model_tx = crawler_to_ai_model_tx.lock().await;
 
-    let path1 = Path::new("./src/");
+    let path1 = Path::new(".");
 
     // TODO: change value of state inside this function before pushing metadata
     // NOTE: state passed in as mutable reference  &StateGuard<'_, CrawlerState>
@@ -108,7 +116,7 @@ async fn internal_behavior<A: SteadyActor>(mut actor: A, crawler_tx: SteadyTx<Fi
             SendOutcome::Success=>{
             }
             SendOutcome::Blocked(_)=>{
-                eprintln!("CrawlerChannel is blocked");
+                //eprintln!("CrawlerChannel is blocked");
             }
             
         }
@@ -120,10 +128,10 @@ async fn internal_behavior<A: SteadyActor>(mut actor: A, crawler_tx: SteadyTx<Fi
 
             match actor.try_send(&mut crawler_tx, message){
                 SendOutcome::Success =>{
-                    eprintln!("Crawler sent to DB");
+                    //eprintln!("Crawler sent to DB");
                 }
                 SendOutcome::Blocked(_) => {
-                    eprintln!("Channel is blocked");
+                    //eprintln!("Channel is blocked");
                 }
             }
             //actor.try_send(&mut crawler_tx, message).expect("couldn't send to DB");
@@ -201,7 +209,7 @@ pub fn visit_dir(dir: &Path,
                     hash = h;
                 }
                 Err(e) => {
-                    eprintln!("Skipping locked/unreadable file {:?}: {}", abs_path, e);
+                    //eprintln!("Skipping locked/unreadable file {:?}: {}", abs_path, e);
                     continue; // skip this entry and move on
                 }
             }
@@ -221,7 +229,7 @@ pub fn visit_dir(dir: &Path,
         }
         Err(e) => {
 		// TODO: log errors here
-                eprintln!("warning: cannot stat {}: {}", file_name, e);
+                //eprintln!("warning: cannot stat {}: {}", file_name, e);
             }
         }
     }
