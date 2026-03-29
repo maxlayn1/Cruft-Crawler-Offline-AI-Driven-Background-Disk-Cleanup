@@ -2,7 +2,7 @@ title = "config-file"
 
 [directory]
 ## settings for the crawling actor to use	
-path = ""
+path = 'C:\Users\rohit\test_dupes'
 last-accessed = ""
 
 [database]
