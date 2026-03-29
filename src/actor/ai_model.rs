@@ -1,253 +1,158 @@
-// Receives FileMeta from crawler, builds prompt, runs LLM, sends FileDecision to UI.
-
 #![allow(unused)]
 
 use steady_state::*;
-use std::error::Error as StdError;
-
 use crate::llm_engine::LlmEngine;
-<<<<<<< Updated upstream
 
-use llama_cpp_2::context::params::LlamaContextParams;
-use llama_cpp_2::llama_backend::LlamaBackend;
-use llama_cpp_2::llama_batch::LlamaBatch;
-use llama_cpp_2::model::params::LlamaModelParams;
-use llama_cpp_2::model::LlamaModel;
-use llama_cpp_2::model::AddBos;
-use llama_cpp_2::sampling::LlamaSampler;
-use std::io::Write;
-use std::num::NonZeroU32;
-use std::{any, fs};
-
-use crate::actor::crawler;
-=======
-use crate::actor::crawler::FileMeta;
-use crate::file_decision::FileDecision;
->>>>>>> Stashed changes
+use std::path::Path;
+use std::error::Error;
 
 const MODEL_FILE_PATH: &str  = "./src/models/Llama-3.2-3B-Instruct-UD-Q4_K_XL.gguf";
-const PROMPT_FILE_PATH: &str = "./src/prompt.txt";
 
-// ── Channel types updated:
-//   IN:  FileMeta      (from crawler — real file metadata)
-//   OUT: FileDecision  (to UI       — metadata + AI verdict)
-pub async fn run(
-    actor: SteadyActorShadow,
-    crawler_to_model_rx: SteadyRx<FileMeta>,
-    ai_model_to_ui_tx:   SteadyTx<FileDecision>,
-) -> Result<(), Box<dyn StdError>> {
+// run function 
+pub async fn run(actor: SteadyActorShadow, crawler_to_model_rx: SteadyRx<String>, ai_model_to_ui_tx: SteadyTx<String>) -> Result<(),Box<dyn Error>> {
 
     let actor = actor.into_spotlight([&crawler_to_model_rx], [&ai_model_to_ui_tx]);
 
     if actor.use_internal_behavior {
         internal_behavior(actor, crawler_to_model_rx, ai_model_to_ui_tx).await
     } else {
-        actor.simulated_behavior(vec![&crawler_to_model_rx]).await
+        actor.simulated_behavior(vec!(&crawler_to_model_rx)).await
     }
 }
 
+
 async fn internal_behavior<A: SteadyActor>(
     mut actor: A,
-    crawler_to_ai_model_rx: SteadyRx<FileMeta>,
-    ai_model_to_ui_tx:      SteadyTx<FileDecision>,
-) -> Result<(), Box<dyn StdError>> {
+    crawler_to_ai_model_rx: SteadyRx<String>,
+    ai_model_to_ui_tx: SteadyTx<String>,
+) -> Result<(), Box<dyn Error>> {
 
-    let mut rx = crawler_to_ai_model_rx.lock().await;
-    let mut tx = ai_model_to_ui_tx.lock().await;
+    let mut crawler_to_ai_model_rx = crawler_to_ai_model_rx.lock().await;
+    let mut ai_model_to_ui_tx = ai_model_to_ui_tx.lock().await;
 
-    // --- Windows-safe absolute path for model ---
-    println!("AI_MODEL: starting, loading model from {}", MODEL_FILE_PATH);
-
-<<<<<<< Updated upstream
-    let prompt1 = fs::read_to_string(PROMPT_FILE_PATH)?;
-    let resp1 = engine.infer_model(&prompt1)?;
-    //println!("Response 1:\n{}", resp1);
-   
-    
-    while actor.is_running(|| crawler_to_ai_model_rx.is_closed_and_empty() || ai_model_to_ui_tx.mark_closed()) {
-		
-		await_for_all!(actor.wait_avail(&mut crawler_to_ai_model_rx, 1), actor.wait_vacant(&mut ai_model_to_ui_tx, 1));
-
-		let resp1 = engine.infer_model(&prompt1)?;
-		
-	    //Reciecing data from crawler actor
-        let received = match actor.try_take(&mut crawler_to_ai_model_rx) {
-			Some(msg) => msg,
-			None => {
-				// channel closed or no message despite wait; decide what to do
-				// e.g. just skip this loop iteration:
-				continue;
-			}
-		};
-=======
-    let abs_model_path = std::fs::canonicalize(MODEL_FILE_PATH)
-        .expect("AI_MODEL: could not resolve model path");
-
-    // Strip Windows extended-length prefix \\?\ that llama.cpp's C backend can't handle
-    let abs_model_path_str = abs_model_path.to_string_lossy().to_string();
-    let abs_model_path_str = abs_model_path_str
-        .strip_prefix(r"\\?\")
-        .unwrap_or(&abs_model_path_str)
-        .to_string();
->>>>>>> Stashed changes
-
-    println!("AI_MODEL: resolved model path = {:?}", abs_model_path_str);
-
-    // Optional sanity check: ensure file exists and show size
-    match std::fs::metadata(&abs_model_path_str) {
-        Ok(md) => println!("AI_MODEL: model file exists, size = {} bytes", md.len()),
-        Err(e) => {
-            eprintln!("AI_MODEL: model file metadata read failed: {}", e);
-            return Err(Box::new(e));
-        }
-    }
-
-    // Load model once at startup — keep it alive for the whole run
-    let engine = match LlmEngine::load_new_model(&abs_model_path_str) {
-        Ok(e) => {
-            println!("AI_MODEL: model loaded successfully");
-            e
-        }
-        Err(e) => {
-            eprintln!("AI_MODEL: FAILED to load model: {}", e);
-            return Err(e.into());
-        }
-    };
-
-    // --- Windows-safe absolute path for prompt ---
-    println!("AI_MODEL: reading prompt template from {}", PROMPT_FILE_PATH);
-
-    let abs_prompt_path = std::fs::canonicalize(PROMPT_FILE_PATH)
-        .expect("AI_MODEL: could not resolve prompt path");
-    println!("AI_MODEL: resolved prompt path = {:?}", abs_prompt_path);
-
-    let prompt_template = match std::fs::read_to_string(&abs_prompt_path) {
-        Ok(p) => p,
-        Err(e) => {
-            eprintln!("AI_MODEL: FAILED to read prompt file: {}", e);
-            return Err(Box::new(e));
-        }
-    };
-
-    println!("AI_MODEL: ready, entering classification loop");
-
-    // IMPORTANT CHANGE:
-    // Don’t call tx.mark_closed() in the loop guard (destructive side effect).
-    // Loop based only on rx state; close tx once at the end.
-    while actor.is_running(|| rx.is_closed_and_empty()) {
-
-        await_for_all!(actor.wait_avail(&mut rx, 1), actor.wait_vacant(&mut tx, 1));
-
-        let meta = match actor.try_take(&mut rx) {
-            Some(m) => m,
-            None    => continue,
-        };
-
-        // Build a prompt by injecting real metadata into the template.
-        // The template already has a "Decision:" marker at the end (see prompt.txt).
-        let filled_prompt = build_prompt(&prompt_template, &meta);
-
-        // Write filled prompt to metadata.txt for debugging (matches existing code pattern)
-        let _ = std::fs::write("metadata.txt", &filled_prompt);
-
-        // Run inference
-        let raw = match engine.infer_model(&filled_prompt) {
-            Ok(output) => output,
-            Err(e) => {
-                eprintln!("AI_MODEL: inference failed for '{}': {}", meta.file_name, e);
-                "pending".to_string()  // mark as pending instead of crashing
+    // Load the model once before the loop
+    let engine = match LlmEngine::load_new_model(MODEL_FILE_PATH) {
+        Ok(e) => e,
+        Err(err) => {
+            // If the model file is missing or fails, fall back to hardcoded "delete"
+            while actor.is_running(|| crawler_to_ai_model_rx.is_closed_and_empty() || ai_model_to_ui_tx.mark_closed()) {
+                await_for_all!(actor.wait_avail(&mut crawler_to_ai_model_rx, 1), actor.wait_vacant(&mut ai_model_to_ui_tx, 1));
+                let received = match actor.try_take(&mut crawler_to_ai_model_rx) {
+                    Some(msg) => msg,
+                    None => continue,
+                };
+                let verdict = format!("delete::{}", received);
+                actor.try_send(&mut ai_model_to_ui_tx, verdict);
             }
-        };
-
-        // Parse LLM output — trim whitespace, lowercase, default to "pending" if unclear
-        let (decision, reason) = parse_llm_output(&raw, &meta);
-
-        let file_decision = FileDecision {
-            meta,
-            ai_decision: decision,
-            ai_reason:   reason,
-        };
-
-        match actor.try_send(&mut tx, file_decision) {
-            SendOutcome::Success    => {}
-            SendOutcome::Blocked(_) => { eprintln!("AI_MODEL: channel to UI blocked"); }
-            SendOutcome::Timeout(_) => { eprintln!("AI_MODEL: channel to UI timeout"); }
-            SendOutcome::Closed(_)  => { break; }
+            return Ok(());
         }
-    }
+    };
 
-    // Close outgoing channel once, explicitly, at end
-    tx.mark_closed();
+    // Load never_delete list from file
+    let never_delete_list: std::collections::HashSet<String> = std::fs::read_to_string("./never_delete.txt")
+        .unwrap_or_default()
+        .lines()
+        .map(|l| l.trim().to_string())
+        .filter(|l| !l.is_empty())
+        .collect();
+
+    while actor.is_running(|| crawler_to_ai_model_rx.is_closed_and_empty() || ai_model_to_ui_tx.mark_closed()) {
+        await_for_all!(actor.wait_avail(&mut crawler_to_ai_model_rx, 1), actor.wait_vacant(&mut ai_model_to_ui_tx, 1));
+
+        let path_str = match actor.try_take(&mut crawler_to_ai_model_rx) {
+            Some(msg) => msg,
+            None => continue,
+        };
+
+        // path_str is "dup_path|orig_path" - extract just the dup path
+        let dup_path = path_str.splitn(2, '|').next().unwrap_or(&path_str).to_string();
+
+        // Skip files the user has marked as never-delete
+        if never_delete_list.contains(&dup_path) {
+            continue;
+        }
+
+        // Build prompt from real file metadata
+        let prompt = build_prompt(&dup_path);
+
+        // Run inference (blocking call - acceptable on a dedicated SoloAct thread)
+        let response = engine.infer_model(&prompt).unwrap_or_else(|_| "keep".to_string());
+
+        // Parse: if response contains "delete" -> delete, otherwise keep
+        let decision = if response.to_lowercase().contains("delete") { "delete" } else { "keep" };
+        let verdict = format!("{}::{}", decision, path_str);
+
+        actor.try_send(&mut ai_model_to_ui_tx, verdict);
+    }
 
     Ok(())
 }
 
-// Inject real FileMeta values into the prompt template.
-// Replaces the placeholder example values with actual file data.
-fn build_prompt(template: &str, meta: &FileMeta) -> String {
-    // The template has a "Decision:" marker — split there so we insert
-    // metadata right before the model is asked to decide.
-    let marker = "Decision:";
-    let parts: Vec<&str> = template.splitn(2, marker).collect();
 
-    let meta_block = format!(
-        "File metadata:\n\
-         - Name: {}\n\
-         - Size: {} bytes\n\
-         - Last modified (unix seconds / 60): {}\n\
-         - Read-only: {}\n\
-         - Is file: {}\n\
-         - SHA-256 (first 1KB): {}\n\
-         - Path: {}\n\n",
-        meta.file_name,
-        meta.size,
-        meta.modified,
-        meta.readonly,
-        meta.is_file,
-        meta.hash,
-        meta.rel_path.display(), // IMPORTANT CHANGE: no {:?} debug quotes
-    );
+fn build_prompt(path_str: &str) -> String {
+    let path = Path::new(path_str);
+    let file_name = path.file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or("unknown");
 
-    // Replace the example metadata block in the template with real data.
-    // We keep the system instruction at the top and the Decision: marker at the end.
-    let system_instruction = parts[0]
-        .lines()
-        .take_while(|l| !l.trim_start().starts_with("File metadata:"))
-        .collect::<Vec<_>>()
-        .join("\n");
+    let (size_str, modified_str) = match std::fs::metadata(path) {
+        Ok(md) => {
+            let size = md.len();
+            let size_str = format_size(size);
+            let modified = filetime::FileTime::from_last_modification_time(&md).seconds();
+            let modified_str = format_age(modified);
+            (size_str, modified_str)
+        }
+        Err(_) => ("unknown".to_string(), "unknown".to_string()),
+    };
 
     format!(
-        "{}\n\n{}{}\n{}",
-        system_instruction.trim(),
-        meta_block,
-        marker,
-        parts.get(1).map_or("", |v| v.trim())
+        "You are a disk cleanup assistant. Respond with exactly one word: delete or keep.
+
+File metadata:
+- Name: {}
+- Size: {}
+- Last modified: {}
+- Note: This file is a duplicate (identical content exists elsewhere on disk)
+
+Decision:",
+        file_name, size_str, modified_str
     )
 }
 
-// Parse the raw LLM output into a (decision, reason) pair.
-// The model is instructed to output one word: "keep" or "delete".
-fn parse_llm_output(raw: &str, meta: &FileMeta) -> (String, String) {
-    let clean = raw.trim().to_lowercase();
 
-    if clean.starts_with("delete") {
-        (
-            "delete".to_string(),
-            format!("LLM classified '{}' for deletion.", meta.file_name),
-        )
-    } else if clean.starts_with("keep") {
-        (
-            "keep".to_string(),
-            format!("LLM classified '{}' to keep.", meta.file_name),
-        )
+fn format_size(bytes: u64) -> String {
+    if bytes >= 1_073_741_824 {
+        format!("{:.1} GB", bytes as f64 / 1_073_741_824.0)
+    } else if bytes >= 1_048_576 {
+        format!("{:.1} MB", bytes as f64 / 1_048_576.0)
+    } else if bytes >= 1024 {
+        format!("{:.1} KB", bytes as f64 / 1024.0)
     } else {
-        (
-            "pending".to_string(),
-            format!(
-                "LLM output was unclear ('{}') for '{}'. Manual review recommended.",
-                raw.trim(),
-                meta.file_name
-            ),
-        )
+        format!("{} bytes", bytes)
+    }
+}
+
+
+fn format_age(modified_secs: i64) -> String {
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs() as i64)
+        .unwrap_or(0);
+    let age_secs = now - modified_secs;
+    if age_secs < 0 {
+        return "recently".to_string();
+    }
+    let days = age_secs / 86400;
+    if days == 0 {
+        "today".to_string()
+    } else if days == 1 {
+        "1 day ago".to_string()
+    } else if days < 30 {
+        format!("{} days ago", days)
+    } else if days < 365 {
+        format!("{} months ago", days / 30)
+    } else {
+        format!("{} years ago", days / 365)
     }
 }

@@ -1,23 +1,6 @@
-// src/actor/user_interface.rs
-// Receives FileDecision from AI_MODEL, stores them in shared state,
-// and serves them over a local HTTP API for the frontend.
-//
-// Endpoints:
-//   GET  http://localhost:3000/api/files       — returns all FileDecisions as JSON
-//   POST http://localhost:3000/api/decision    — receives user keep/delete override
-//   GET  http://localhost:3000/api/status      — returns current scan status
-//
-// Add to Cargo.toml:
-//   axum            = "0.7"
-//   tokio           = { version = "1", features = ["full"] }
-//   tower-http      = { version = "0.5", features = ["cors"] }
-//   serde_json      = "1"
-//   serde           = { version = "1", features = ["derive"] }
-
 #![allow(unused)]
 
 use steady_state::*;
-<<<<<<< Updated upstream
 use std::path::PathBuf;
 use std::sync::mpsc;
 
@@ -33,60 +16,11 @@ use ratatui::{
 pub async fn run(
     actor: SteadyActorShadow,
     ai_model_to_ui_rx: SteadyRx<String>,
-    ui_to_db_tx: SteadyTx<PathBuf>,
+    ui_to_db_tx: SteadyTx<String>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let actor = actor.into_spotlight([&ai_model_to_ui_rx], [&ui_to_db_tx]);
     if actor.use_internal_behavior {
         internal_behavior(actor, ai_model_to_ui_rx, ui_to_db_tx).await
-=======
-use std::sync::{Arc, Mutex};
-use std::collections::HashMap;
-
-use axum::{
-    Router,
-    routing::{get, post},
-    extract::State,
-    http::{Method, HeaderValue},
-    Json,
-};
-use tower_http::cors::{CorsLayer, Any};
-use serde::{Serialize, Deserialize};
-use serde_json::json;
-
-use crate::actor::crawler::FileMeta;
-use crate::file_decision::FileDecision;
-
-// ── Shared state between the actor loop and the HTTP server ──────────────────
-
-#[derive(Clone)]
-struct AppState {
-    // key = file name, value = latest decision
-    // Using HashMap so user overrides replace AI decisions cleanly
-    files:  Arc<Mutex<HashMap<String, FileDecision>>>,
-    status: Arc<Mutex<String>>,
-}
-
-// ── Request / Response types ─────────────────────────────────────────────────
-
-#[derive(Deserialize)]
-struct UserDecisionRequest {
-    name:     String,
-    decision: String,  // "keep" | "delete"
-}
-
-// ── Actor entry point ─────────────────────────────────────────────────────────
-
-pub async fn run(
-    actor: SteadyActorShadow,
-    ai_model_to_ui_rx:      SteadyRx<FileDecision>,
-    ui_to_file_handler_tx:  SteadyTx<String>,
-) -> Result<(), Box<dyn Error>> {
-
-    let actor = actor.into_spotlight([&ai_model_to_ui_rx], [&ui_to_file_handler_tx]);
-
-    if actor.use_internal_behavior {
-        internal_behavior(actor, ai_model_to_ui_rx, ui_to_file_handler_tx).await
->>>>>>> Stashed changes
     } else {
         actor.simulated_behavior(vec![&ai_model_to_ui_rx]).await
     }
@@ -94,17 +28,16 @@ pub async fn run(
 
 async fn internal_behavior<A: SteadyActor>(
     mut actor: A,
-<<<<<<< Updated upstream
     ai_model_to_ui_rx: SteadyRx<String>,
-    ui_to_db_tx: SteadyTx<PathBuf>,
+    ui_to_db_tx: SteadyTx<String>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let mut ai_model_to_ui_rx = ai_model_to_ui_rx.lock().await;
     let mut ui_to_db_tx = ui_to_db_tx.lock().await;
 
     // actor → TUI thread: send new suggested files
-    let (suggest_tx, suggest_rx) = mpsc::channel::<PathBuf>();
-    // TUI thread → actor: send confirmed deletions
-    let (delete_tx, delete_rx) = mpsc::channel::<PathBuf>();
+    let (suggest_tx, suggest_rx) = mpsc::channel::<(PathBuf, PathBuf)>();
+    // TUI thread → actor: send delete/never_delete commands
+    let (delete_tx, delete_rx) = mpsc::channel::<String>();
 
     // Spawn TUI on a plain OS thread (no Tokio reactor needed)
 	std::thread::spawn(move || {
@@ -114,107 +47,49 @@ async fn internal_behavior<A: SteadyActor>(
 		if let Err(e) = result {
 			eprintln!("TUI error: {}", e);
 		}
+		// q was pressed - shut down the entire process cleanly
+		std::process::exit(0);
 	});
 
     while actor.is_running(|| ai_model_to_ui_rx.is_closed_and_empty()) {
         // Forward AI verdicts to the TUI thread
         while let Some(verdict) = actor.try_take(&mut ai_model_to_ui_rx) {
-            // TODO: replace with real FileMeta path once channel type is updated
-            if verdict.trim().to_lowercase() == "delete" {
-                let _ = suggest_tx.send(PathBuf::from(&verdict));
+            // Format is "delete::dup_path|orig_path"
+            if let Some((decision, paths)) = verdict.split_once("::") {
+                if decision.trim().to_lowercase() == "delete" {
+                    let (dup, orig) = match paths.split_once('|') {
+                        Some((d, o)) => (PathBuf::from(d), PathBuf::from(o)),
+                        None => (PathBuf::from(paths), PathBuf::new()),
+                    };
+                    let _ = suggest_tx.send((dup, orig));
+                }
             }
         }
 
-        // Forward confirmed deletions to DB actor
-        while let Ok(path) = delete_rx.try_recv() {
+        // Forward delete/never_delete commands to DB actor
+        while let Ok(cmd) = delete_rx.try_recv() {
             actor.wait_vacant(&mut ui_to_db_tx, 1).await;
-            actor.try_send(&mut ui_to_db_tx, path);
+            actor.try_send(&mut ui_to_db_tx, cmd);
         }
 
         actor.wait_avail(&mut ai_model_to_ui_rx, 1).await;
-=======
-    ai_model_to_ui_rx:     SteadyRx<FileDecision>,
-    ui_to_file_handler_tx: SteadyTx<String>,
-) -> Result<(), Box<dyn Error>> {
-
-    let mut rx = ai_model_to_ui_rx.lock().await;
-    let mut tx = ui_to_file_handler_tx.lock().await;
-
-    // Shared state — the HTTP server and this actor loop both access it
-    let state = AppState {
-        files:  Arc::new(Mutex::new(HashMap::new())),
-        status: Arc::new(Mutex::new("scanning".to_string())),
-    };
-
-    // Spawn the HTTP server on a separate task so it runs concurrently
-    let server_state = state.clone();
-    std::thread::spawn(move || {
-    tokio::runtime::Runtime::new()
-        .expect("failed to create Tokio runtime for HTTP server")
-        .block_on(start_http_server(server_state));
-});
-
-
-    println!("UI_ACTOR: HTTP server started at http://localhost:3000");
-
-    while actor.is_running(|| rx.is_closed_and_empty()) {
-
-        await_for_all!(actor.wait_avail(&mut rx, 1), actor.wait_vacant(&mut tx, 1));
-
-        let decision = match actor.try_take(&mut rx) {
-            Some(d) => d,
-            None    => continue,
-        };
-
-        let file_name = decision.meta.file_name.clone();
-        let ai_dec    = decision.ai_decision.clone();
-
-        // Store in shared state so the HTTP server can serve it
-        {
-            let mut files = state.files.lock().unwrap();
-            files.insert(file_name.clone(), decision);
-        }
-
-        println!("UI_ACTOR: received '{}' → {}", file_name, ai_dec);
-
-        // If AI said delete, forward the file name to the file handler
-        if ai_dec == "delete" {
-            match actor.try_send(&mut tx, file_name.clone()) {
-    SendOutcome::Success    => {}
-    SendOutcome::Blocked(_) => {
-        eprintln!("UI_ACTOR: file handler channel blocked for '{}'", file_name);
-    }
-    SendOutcome::Timeout(_) => {
-        eprintln!("UI_ACTOR: file handler channel timeout for '{}'", file_name);
-    }
-    SendOutcome::Closed(_)  => { break; }
-}
-        }
-    }
-
-    // Mark scan as complete when actor loop ends
-    {
-        let mut status = state.status.lock().unwrap();
-        *status = "complete".to_string();
->>>>>>> Stashed changes
     }
 
     Ok(())
 }
 
-<<<<<<< Updated upstream
 // ── TUI App State ────────────────────────────────────────────────────────────
 
 struct App {
-    suggested_files: Vec<PathBuf>,
+    suggested_files: Vec<(PathBuf, PathBuf)>,
     list_state: ListState,
     status: String,
-    suggest_rx: mpsc::Receiver<PathBuf>,
-    delete_tx: mpsc::Sender<PathBuf>,
+    suggest_rx: mpsc::Receiver<(PathBuf, PathBuf)>,
+    delete_tx: mpsc::Sender<String>,
 }
 
 impl App {
-    fn new(suggest_rx: mpsc::Receiver<PathBuf>, delete_tx: mpsc::Sender<PathBuf>) -> Self {
+    fn new(suggest_rx: mpsc::Receiver<(PathBuf, PathBuf)>, delete_tx: mpsc::Sender<String>) -> Self {
         let mut list_state = ListState::default();
         list_state.select(Some(0));
         Self {
@@ -226,7 +101,7 @@ impl App {
         }
     }
 
-    fn selected_path(&self) -> Option<PathBuf> {
+    fn selected_path(&self) -> Option<(PathBuf, PathBuf)> {
         self.list_state
             .selected()
             .and_then(|i| self.suggested_files.get(i))
@@ -263,10 +138,11 @@ impl App {
     }
 
     fn delete_selected(&mut self) {
-        if let Some(path) = self.selected_path() {
-            self.suggested_files.retain(|p| *p != path);
-            let _ = self.delete_tx.send(path.clone());
-            self.status = format!("Deleted: {:?}", path);
+        if let Some((dup, _orig)) = self.selected_path() {
+            self.suggested_files.retain(|(d, _)| *d != dup);
+            let cmd = format!("delete::{}", dup.display());
+            let _ = self.delete_tx.send(cmd);
+            self.status = format!("Deleted: {}", dup.display());
             self.clamp_selection();
         } else {
             self.status = String::from("No file selected.");
@@ -274,9 +150,9 @@ impl App {
     }
 
     fn keep_selected(&mut self) {
-        if let Some(path) = self.selected_path() {
-            self.suggested_files.retain(|p| *p != path);
-            self.status = format!("Kept: {:?}", path);
+        if let Some((dup, _orig)) = self.selected_path() {
+            self.suggested_files.retain(|(d, _)| *d != dup);
+            self.status = format!("Kept: {}", dup.display());
             self.clamp_selection();
         } else {
             self.status = String::from("No file selected.");
@@ -284,10 +160,17 @@ impl App {
     }
 
     fn never_delete_selected(&mut self) {
-        if let Some(path) = self.selected_path() {
-            self.suggested_files.retain(|p| *p != path);
-            self.status = format!("Marked never-delete: {:?}", path);
-            // TODO: persist to sled DB
+        if let Some((dup, _orig)) = self.selected_path() {
+            self.suggested_files.retain(|(d, _)| *d != dup);
+            let _ = std::fs::OpenOptions::new()
+                .create(true)
+                .append(true)
+                .open("./never_delete.txt")
+                .and_then(|mut f| {
+                    use std::io::Write;
+                    writeln!(f, "{}", dup.display())
+                });
+            self.status = format!("Never-delete: {}", dup.display());
             self.clamp_selection();
         } else {
             self.status = String::from("No file selected.");
@@ -296,10 +179,18 @@ impl App {
 
     // Pull any new suggestions from the actor
     fn poll_suggestions(&mut self) {
-        while let Ok(path) = self.suggest_rx.try_recv() {
-            self.suggested_files.push(path);
-            if self.list_state.selected().is_none() {
-                self.list_state.select(Some(0));
+        // Process at most 20 items per frame so the TUI stays responsive
+        for _ in 0..20 {
+            match self.suggest_rx.try_recv() {
+                Ok((dup, orig)) => {
+                    if !self.suggested_files.iter().any(|(d, _)| *d == dup) {
+                        self.suggested_files.push((dup, orig));
+                        if self.list_state.selected().is_none() {
+                            self.list_state.select(Some(0));
+                        }
+                    }
+                }
+                Err(_) => break,
             }
         }
     }
@@ -309,8 +200,8 @@ impl App {
 
 fn run_tui(
     terminal: &mut DefaultTerminal,
-    suggest_rx: mpsc::Receiver<PathBuf>,
-    delete_tx: mpsc::Sender<PathBuf>,
+    suggest_rx: mpsc::Receiver<(PathBuf, PathBuf)>,
+    delete_tx: mpsc::Sender<String>,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let mut app = App::new(suggest_rx, delete_tx);
 
@@ -353,9 +244,15 @@ fn render(frame: &mut Frame, app: &mut App) {
         .suggested_files
         .iter()
         .enumerate()
-        .map(|(i, path)| {
-            let label = format!("[{}] {}", i + 1, path.display());
-            ListItem::new(label)
+        .map(|(i, (dup, orig))| {
+            let line1 = ratatui::text::Line::from(format!("[{}] {}", i + 1, dup.display()));
+            let line2 = ratatui::text::Line::from(
+                ratatui::text::Span::styled(
+                    format!("    copy of: {}", orig.display()),
+                    Style::default().fg(Color::DarkGray),
+                )
+            );
+            ListItem::new(ratatui::text::Text::from(vec![line1, line2]))
         })
         .collect();
 
@@ -385,62 +282,3 @@ fn render(frame: &mut Frame, app: &mut App) {
     let status = Paragraph::new(app.status.as_str()).fg(Color::DarkGray);
     frame.render_widget(status, status_area);
 }
-=======
-// ── HTTP server ───────────────────────────────────────────────────────────────
-
-async fn start_http_server(state: AppState) {
-
-    // Allow the frontend HTML file (opened from file://) to call localhost
-    let cors = CorsLayer::new()
-        .allow_origin(Any)
-        .allow_methods([Method::GET, Method::POST])
-        .allow_headers(Any);
-
-    let app = Router::new()
-        .route("/api/files",    get(handle_get_files))
-        .route("/api/decision", post(handle_post_decision))
-        .route("/api/status",   get(handle_get_status))
-        .layer(cors)
-        .with_state(state);
-
-    let listener = tokio::net::TcpListener::bind("0.0.0.0:3000")
-        .await
-        .expect("UI_ACTOR: failed to bind port 3000");
-
-    axum::serve(listener, app)
-        .await
-        .expect("UI_ACTOR: server error");
-}
-
-// GET /api/files — return all file decisions as a JSON array
-async fn handle_get_files(State(state): State<AppState>) -> Json<serde_json::Value> {
-    let files = state.files.lock().unwrap();
-    let list: Vec<&FileDecision> = files.values().collect();
-    Json(json!(list))
-}
-
-// POST /api/decision — user overrides a single file's decision
-// Body: { "name": "foo.txt", "decision": "keep" }
-async fn handle_post_decision(
-    State(state): State<AppState>,
-    Json(req): Json<UserDecisionRequest>,
-) -> Json<serde_json::Value> {
-
-    let mut files = state.files.lock().unwrap();
-
-    if let Some(entry) = files.get_mut(&req.name) {
-        entry.ai_decision = req.decision.clone();
-        entry.ai_reason   = format!("[User override] Manually marked as {}.", req.decision);
-        Json(json!({ "ok": true, "name": req.name, "decision": req.decision }))
-    } else {
-        Json(json!({ "ok": false, "error": "file not found" }))
-    }
-}
-
-// GET /api/status — let the frontend poll whether the scan is still running
-async fn handle_get_status(State(state): State<AppState>) -> Json<serde_json::Value> {
-    let status = state.status.lock().unwrap().clone();
-    let count  = state.files.lock().unwrap().len();
-    Json(json!({ "status": status, "files_processed": count }))
-}
->>>>>>> Stashed changes
