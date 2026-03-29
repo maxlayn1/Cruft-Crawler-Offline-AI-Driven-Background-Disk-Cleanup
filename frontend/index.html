@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CruftCrawler</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      background: #0f0f1a;
+      color: #e0e0e0;
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* ── Header ── */
+    .header {
+      background: linear-gradient(135deg, #1a1a2e, #16213e);
+      padding: 18px 28px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid #0f3460;
+      flex-shrink: 0;
+    }
+    .header-left { display: flex; align-items: center; gap: 14px; }
+    .logo {
+      width: 40px; height: 40px;
+      background: linear-gradient(135deg, #e94560, #0f3460);
+      border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 20px;
+    }
+    .title { font-size: 20px; font-weight: 700; color: #fff; }
+    .subtitle { font-size: 12px; color: #888; margin-top: 2px; }
+
+    .scan-status {
+      display: flex; align-items: center; gap: 8px;
+      background: #1a2744;
+      padding: 8px 16px;
+      border-radius: 20px;
+      font-size: 13px;
+      color: #7eb8f7;
+    }
+    .spinner {
+      width: 12px; height: 12px;
+      border: 2px solid #7eb8f7;
+      border-top-color: transparent;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .spinner.done {
+      border-color: #4caf50;
+      border-top-color: #4caf50;
+      animation: none;
+    }
+
+    /* ── Stats Bar ── */
+    .stats-bar {
+      background: #13131f;
+      padding: 12px 28px;
+      display: flex;
+      gap: 32px;
+      border-bottom: 1px solid #1e1e35;
+      flex-shrink: 0;
+    }
+    .stat { display: flex; flex-direction: column; gap: 2px; }
+    .stat-value { font-size: 22px; font-weight: 700; color: #e94560; }
+    .stat-label { font-size: 11px; color: #666; text-transform: uppercase; letter-spacing: 0.5px; }
+    .stat.green .stat-value { color: #4caf50; }
+    .stat.blue .stat-value { color: #7eb8f7; }
+
+    /* ── File List ── */
+    .file-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 16px 28px;
+    }
+    .file-list::-webkit-scrollbar { width: 6px; }
+    .file-list::-webkit-scrollbar-track { background: #13131f; }
+    .file-list::-webkit-scrollbar-thumb { background: #2a2a4a; border-radius: 3px; }
+
+    .empty-state {
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      height: 100%;
+      color: #444;
+      gap: 12px;
+    }
+    .empty-state .icon { font-size: 48px; }
+    .empty-state .msg { font-size: 16px; }
+    .empty-state .sub { font-size: 13px; color: #333; }
+
+    .card {
+      background: #1a1a2e;
+      border: 1px solid #252545;
+      border-radius: 12px;
+      padding: 16px 20px;
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      transition: border-color 0.2s, background 0.2s;
+      animation: slideIn 0.3s ease;
+    }
+    @keyframes slideIn {
+      from { opacity: 0; transform: translateY(-8px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    .card:hover { border-color: #3a3a6a; background: #1e1e38; }
+    .card.removing {
+      animation: fadeOut 0.3s ease forwards;
+    }
+    @keyframes fadeOut {
+      to { opacity: 0; transform: translateX(20px); height: 0; padding: 0; margin: 0; }
+    }
+
+    .card-info { flex: 1; min-width: 0; }
+    .card-filename {
+      font-size: 15px; font-weight: 600; color: #fff;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .card-filepath {
+      font-size: 12px; color: #666; margin-top: 3px;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .card-orig {
+      font-size: 12px; color: #4a7fbf; margin-top: 6px;
+      display: flex; align-items: center; gap: 6px;
+    }
+    .card-orig::before {
+      content: '⇒';
+      color: #3a6090;
+    }
+
+    .card-meta {
+      display: flex; flex-direction: column; align-items: flex-end;
+      gap: 4px; flex-shrink: 0;
+    }
+    .badge {
+      font-size: 11px; padding: 3px 10px; border-radius: 20px;
+      font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;
+    }
+    .badge.delete { background: rgba(233,69,96,0.2); color: #e94560; border: 1px solid rgba(233,69,96,0.3); }
+    .badge.keep   { background: rgba(76,175,80,0.2); color: #4caf50; border: 1px solid rgba(76,175,80,0.3); }
+    .card-size { font-size: 12px; color: #555; }
+
+    .card-actions { display: flex; gap: 8px; flex-shrink: 0; }
+    .btn {
+      padding: 7px 14px; border-radius: 8px; border: none;
+      font-size: 13px; font-weight: 600; cursor: pointer;
+      transition: opacity 0.15s, transform 0.1s;
+    }
+    .btn:hover { opacity: 0.85; transform: translateY(-1px); }
+    .btn:active { transform: translateY(0); }
+    .btn-delete { background: #e94560; color: #fff; }
+    .btn-keep   { background: #2d6a4f; color: #95d5b2; }
+    .btn-never  { background: #1a4a7a; color: #7eb8f7; }
+
+    /* ── Status Bar ── */
+    .status-bar {
+      background: #0d0d1a;
+      padding: 8px 28px;
+      font-size: 12px;
+      color: #555;
+      border-top: 1px solid #1a1a2e;
+      display: flex;
+      justify-content: space-between;
+      flex-shrink: 0;
+    }
+    .status-bar .status-msg { color: #7eb8f7; }
+  </style>
+</head>
+<body>
+
+  <!-- Header -->
+  <div class="header">
+    <div class="header-left">
+      <div class="logo">🗑</div>
+      <div>
+        <div class="title">CruftCrawler</div>
+        <div class="subtitle">Offline AI-Driven Disk Cleanup</div>
+      </div>
+    </div>
+    <div class="scan-status" id="scanStatus">
+      <div class="spinner" id="spinner"></div>
+      <span id="scanText">Scanning...</span>
+    </div>
+  </div>
+
+  <!-- Stats -->
+  <div class="stats-bar">
+    <div class="stat">
+      <div class="stat-value" id="dupCount">0</div>
+      <div class="stat-label">Duplicates Found</div>
+    </div>
+    <div class="stat green">
+      <div class="stat-value" id="spaceCount">0 B</div>
+      <div class="stat-label">Space Recoverable</div>
+    </div>
+    <div class="stat blue">
+      <div class="stat-value" id="deletedCount">0</div>
+      <div class="stat-label">Deleted This Session</div>
+    </div>
+  </div>
+
+  <!-- File List -->
+  <div class="file-list" id="fileList">
+    <div class="empty-state" id="emptyState">
+      <div class="icon">🔍</div>
+      <div class="msg">Scanning for duplicates...</div>
+      <div class="sub">AI suggestions will appear here</div>
+    </div>
+  </div>
+
+  <!-- Status Bar -->
+  <div class="status-bar">
+    <span class="status-msg" id="statusMsg">Waiting for AI suggestions...</span>
+    <span>CruftCrawler v0.1</span>
+  </div>
+
+  <script>
+    const invoke = window.__TAURI__.core.invoke;
+    const listen  = window.__TAURI__.event.listen;
+
+    let totalSize = 0;
+    let deletedCount = 0;
+    let dupCount = 0;
+
+    function formatSize(bytes) {
+      if (bytes >= 1073741824) return (bytes / 1073741824).toFixed(1) + ' GB';
+      if (bytes >= 1048576)    return (bytes / 1048576).toFixed(1) + ' MB';
+      if (bytes >= 1024)       return (bytes / 1024).toFixed(1) + ' KB';
+      return bytes + ' B';
+    }
+
+    function filename(path) {
+      return path.replace(/\\/g, '/').split('/').pop();
+    }
+
+    function addCard(dup, orig, size, aiVerdict) {
+      dupCount++;
+      totalSize += size;
+      document.getElementById('dupCount').textContent = dupCount;
+      document.getElementById('spaceCount').textContent = formatSize(totalSize);
+
+      const emptyState = document.getElementById('emptyState');
+      if (emptyState) emptyState.remove();
+
+      const card = document.createElement('div');
+      card.className = 'card';
+      card.dataset.path = dup;
+      card.dataset.size = size;
+
+      const verdict = aiVerdict.toLowerCase().includes('delete') ? 'delete' : 'keep';
+
+      card.innerHTML = `
+        <div class="card-info">
+          <div class="card-filename">${filename(dup)}</div>
+          <div class="card-filepath">${dup}</div>
+          <div class="card-orig">${orig}</div>
+        </div>
+        <div class="card-meta">
+          <span class="badge ${verdict}">${verdict}</span>
+          <span class="card-size">${formatSize(size)}</span>
+        </div>
+        <div class="card-actions">
+          <button class="btn btn-delete" onclick="doDelete(this)">Delete</button>
+          <button class="btn btn-keep"   onclick="doKeep(this)">Keep</button>
+          <button class="btn btn-never"  onclick="doNever(this)">Never</button>
+        </div>
+      `;
+
+      document.getElementById('fileList').appendChild(card);
+    }
+
+    function removeCard(btn) {
+      const card = btn.closest('.card');
+      card.classList.add('removing');
+      setTimeout(() => card.remove(), 320);
+    }
+
+    async function doDelete(btn) {
+      const card = btn.closest('.card');
+      const path = card.dataset.path;
+      const size = parseInt(card.dataset.size) || 0;
+      try {
+        await invoke('delete_file', { path });
+        totalSize = Math.max(0, totalSize - size);
+        deletedCount++;
+        document.getElementById('spaceCount').textContent = formatSize(totalSize);
+        document.getElementById('deletedCount').textContent = deletedCount;
+        document.getElementById('statusMsg').textContent = 'Deleted: ' + path;
+        removeCard(btn);
+        dupCount--;
+        document.getElementById('dupCount').textContent = dupCount;
+      } catch (e) {
+        document.getElementById('statusMsg').textContent = 'Error: ' + e;
+      }
+    }
+
+    async function doKeep(btn) {
+      const card = btn.closest('.card');
+      document.getElementById('statusMsg').textContent = 'Kept: ' + card.dataset.path;
+      removeCard(btn);
+      dupCount--;
+      document.getElementById('dupCount').textContent = dupCount;
+    }
+
+    async function doNever(btn) {
+      const card = btn.closest('.card');
+      const path = card.dataset.path;
+      try {
+        await invoke('never_delete_file', { path });
+        document.getElementById('statusMsg').textContent = 'Never-delete saved: ' + path;
+        removeCard(btn);
+        dupCount--;
+        document.getElementById('dupCount').textContent = dupCount;
+      } catch (e) {
+        document.getElementById('statusMsg').textContent = 'Error: ' + e;
+      }
+    }
+
+    // Wait for Tauri globals then register listeners
+    async function setup() {
+      try {
+        // Wait for window.__TAURI__ to be injected
+        let attempts = 0;
+        while (!window.__TAURI__ && attempts < 50) {
+          await new Promise(r => setTimeout(r, 100));
+          attempts++;
+        }
+        if (!window.__TAURI__) {
+          document.getElementById('statusMsg').textContent = 'ERROR: Tauri API not available';
+          return;
+        }
+        const inv = window.__TAURI__.core.invoke;
+        const lis = window.__TAURI__.event.listen;
+        document.getElementById('statusMsg').textContent = 'Tauri ready, registering listeners...';
+
+        await lis('duplicate-found', (e) => {
+          const { dup, orig, size, verdict } = e.payload;
+          addCard(dup, orig, size || 0, verdict || 'delete');
+        });
+        await lis('scan-complete', () => {
+          document.getElementById('spinner').classList.add('done');
+          document.getElementById('scanText').textContent = 'Scan complete';
+          document.getElementById('statusMsg').textContent = 'Scan complete — ' + dupCount + ' duplicates found';
+        });
+        document.getElementById('statusMsg').textContent = 'Waiting for AI suggestions...';
+      } catch(err) {
+        document.getElementById('statusMsg').textContent = 'ERROR: ' + err;
+      }
+    }
+    setup();
+  </script>
+</body>
+</html>
