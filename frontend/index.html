@@ -52,13 +52,95 @@
       border-top-color: transparent;
       border-radius: 50%;
       animation: spin 0.8s linear infinite;
+      display: none;
     }
+    .spinner.active { display: block; }
     @keyframes spin { to { transform: rotate(360deg); } }
     .spinner.done {
+      display: block;
       border-color: #4caf50;
       border-top-color: #4caf50;
       animation: none;
     }
+
+    /* ── Folder Picker ── */
+    .path-bar {
+      background: #13131f;
+      padding: 8px 28px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      border-bottom: 1px solid #1e1e35;
+      flex-shrink: 0;
+    }
+    .path-label { font-size: 12px; color: #555; white-space: nowrap; }
+    .path-input {
+      flex: 1;
+      background: #0f0f1a;
+      border: 1px solid #2a2a4a;
+      border-radius: 6px;
+      padding: 5px 10px;
+      color: #aaa;
+      font-size: 12px;
+      font-family: monospace;
+    }
+    .path-input:focus { outline: none; border-color: #7eb8f7; color: #fff; }
+    .path-btn {
+      background: #1a4a7a;
+      color: #7eb8f7;
+      border: none;
+      border-radius: 6px;
+      padding: 5px 14px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .path-btn:hover { opacity: 0.85; }
+    .path-btn.danger {
+      background: #4a1a2a;
+      color: #e94560;
+    }
+    .path-btn.start {
+      background: #1a4a2a;
+      color: #4caf50;
+    }
+    .path-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    /* ── Folder Preview ── */
+    .folder-preview {
+      background: #0f0f1a;
+      border-bottom: 1px solid #1e1e35;
+      padding: 0 28px;
+      max-height: 0;
+      overflow: hidden;
+      transition: max-height 0.3s ease, padding 0.3s ease;
+      flex-shrink: 0;
+    }
+    .folder-preview.open {
+      max-height: 160px;
+      padding: 10px 28px;
+    }
+    .preview-label {
+      font-size: 11px; color: #555; text-transform: uppercase;
+      letter-spacing: 0.5px; margin-bottom: 6px;
+    }
+    .preview-list {
+      display: flex; flex-wrap: wrap; gap: 6px;
+      max-height: 110px; overflow-y: auto;
+    }
+    .preview-list::-webkit-scrollbar { width: 4px; }
+    .preview-list::-webkit-scrollbar-thumb { background: #2a2a4a; border-radius: 2px; }
+    .preview-item {
+      font-size: 11px;
+      background: #1a1a2e;
+      border: 1px solid #252545;
+      border-radius: 4px;
+      padding: 3px 8px;
+      color: #aaa;
+      white-space: nowrap;
+    }
+    .preview-item.dir { color: #7eb8f7; border-color: #1a3a5a; }
 
     /* ── Stats Bar ── */
     .stats-bar {
@@ -114,9 +196,7 @@
       to   { opacity: 1; transform: translateY(0); }
     }
     .card:hover { border-color: #3a3a6a; background: #1e1e38; }
-    .card.removing {
-      animation: fadeOut 0.3s ease forwards;
-    }
+    .card.removing { animation: fadeOut 0.3s ease forwards; }
     @keyframes fadeOut {
       to { opacity: 0; transform: translateX(20px); height: 0; padding: 0; margin: 0; }
     }
@@ -134,10 +214,7 @@
       font-size: 12px; color: #4a7fbf; margin-top: 6px;
       display: flex; align-items: center; gap: 6px;
     }
-    .card-orig::before {
-      content: '⇒';
-      color: #3a6090;
-    }
+    .card-orig::before { content: '=>'; color: #3a6090; }
 
     .card-meta {
       display: flex; flex-direction: column; align-items: flex-end;
@@ -148,7 +225,7 @@
       font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;
     }
     .badge.delete { background: rgba(233,69,96,0.2); color: #e94560; border: 1px solid rgba(233,69,96,0.3); }
-    .badge.keep   { background: rgba(76,175,80,0.2); color: #4caf50; border: 1px solid rgba(76,175,80,0.3); }
+    .badge.keep   { background: rgba(76,175,80,0.2);  color: #4caf50; border: 1px solid rgba(76,175,80,0.3); }
     .card-size { font-size: 12px; color: #555; }
 
     .card-actions { display: flex; gap: 8px; flex-shrink: 0; }
@@ -182,7 +259,7 @@
   <!-- Header -->
   <div class="header">
     <div class="header-left">
-      <div class="logo">🗑</div>
+      <div class="logo">&#128465;</div>
       <div>
         <div class="title">CruftCrawler</div>
         <div class="subtitle">Offline AI-Driven Disk Cleanup</div>
@@ -190,8 +267,23 @@
     </div>
     <div class="scan-status" id="scanStatus">
       <div class="spinner" id="spinner"></div>
-      <span id="scanText">Scanning: <span id="scanPath">...</span></span>
+      <span id="scanText">Ready — select a folder and click Start Scan</span>
     </div>
+  </div>
+
+  <!-- Path Bar -->
+  <div class="path-bar">
+    <span class="path-label">Scan folder:</span>
+    <input class="path-input" id="pathInput" type="text" placeholder="Enter folder path or click Browse..." />
+    <button class="path-btn" onclick="browsePath()">&#128193; Browse</button>
+    <button class="path-btn start" id="startBtn" onclick="doStartScan()">&#9654; Start Scan</button>
+    <button class="path-btn danger" onclick="doRestart()">&#8635; Apply &amp; Restart</button>
+  </div>
+
+  <!-- Folder Preview -->
+  <div class="folder-preview" id="folderPreview">
+    <div class="preview-label">Folder contents</div>
+    <div class="preview-list" id="previewList"></div>
   </div>
 
   <!-- Stats -->
@@ -213,15 +305,15 @@
   <!-- File List -->
   <div class="file-list" id="fileList">
     <div class="empty-state" id="emptyState">
-      <div class="icon">🔍</div>
-      <div class="msg">Scanning for duplicates...</div>
-      <div class="sub">AI suggestions will appear here</div>
+      <div class="icon">&#128269;</div>
+      <div class="msg">Select a folder above and click Start Scan</div>
+      <div class="sub">AI duplicate suggestions will appear here</div>
     </div>
   </div>
 
   <!-- Status Bar -->
   <div class="status-bar">
-    <span class="status-msg" id="statusMsg">Waiting for AI suggestions...</span>
+    <span class="status-msg" id="statusMsg">Idle</span>
     <span>CruftCrawler v0.1</span>
   </div>
 
@@ -232,6 +324,7 @@
     let totalSize = 0;
     let deletedCount = 0;
     let dupCount = 0;
+    let scanStarted = false;
 
     function formatSize(bytes) {
       if (bytes >= 1073741824) return (bytes / 1073741824).toFixed(1) + ' GB';
@@ -243,6 +336,96 @@
     function filename(path) {
       return path.replace(/\\/g, '/').split('/').pop();
     }
+
+    // ── Folder preview ────────────────────────────────────────────────────────
+
+    async function showFolderPreview(path) {
+      if (!path) return;
+      try {
+        const entries = await invoke('list_folder', { path });
+        const list = document.getElementById('previewList');
+        list.innerHTML = '';
+        if (entries.length === 0) {
+          list.innerHTML = '<span style="color:#444;font-size:12px">Empty folder</span>';
+        } else {
+          entries.forEach(name => {
+            const span = document.createElement('span');
+            span.className = 'preview-item' + (name.startsWith('[DIR]') ? ' dir' : '');
+            span.textContent = name;
+            list.appendChild(span);
+          });
+        }
+        document.getElementById('folderPreview').classList.add('open');
+      } catch(e) {
+        console.warn('list_folder error:', e);
+      }
+    }
+
+    // ── Controls ──────────────────────────────────────────────────────────────
+
+    async function browsePath() {
+      try {
+        const dialog = window.__TAURI__.dialog;
+        const selected = await dialog.open({ directory: true, multiple: false, title: 'Select folder to scan' });
+        if (selected) {
+          document.getElementById('pathInput').value = selected;
+          await showFolderPreview(selected);
+        }
+      } catch(e) {
+        document.getElementById('statusMsg').textContent = 'Error opening dialog: ' + e;
+      }
+    }
+
+    async function loadPath() {
+      try {
+        const p = await invoke('get_scan_path');
+        document.getElementById('pathInput').value = p;
+        await showFolderPreview(p);
+      } catch(e) {}
+    }
+
+    async function doStartScan() {
+      if (scanStarted) {
+        document.getElementById('statusMsg').textContent = 'Scan already running.';
+        return;
+      }
+      const p = document.getElementById('pathInput').value.trim();
+      if (!p) {
+        document.getElementById('statusMsg').textContent = 'Please select a folder first.';
+        return;
+      }
+      // Save path first
+      try { await invoke('set_scan_path', { newPath: p }); } catch(e) {}
+
+      // Close preview, update UI
+      document.getElementById('folderPreview').classList.remove('open');
+      scanStarted = true;
+      document.getElementById('startBtn').disabled = true;
+      document.getElementById('spinner').classList.add('active');
+      document.getElementById('scanText').textContent = 'Scanning: ' + p;
+      document.getElementById('statusMsg').textContent = 'Scan started...';
+
+      try {
+        await invoke('start_scan');
+      } catch(e) {
+        document.getElementById('statusMsg').textContent = 'Error starting scan: ' + e;
+      }
+    }
+
+    async function doRestart() {
+      const p = document.getElementById('pathInput').value.trim();
+      if (p) {
+        try { await invoke('set_scan_path', { newPath: p }); } catch(e) {}
+      }
+      document.getElementById('statusMsg').textContent = 'Restarting...';
+      try {
+        await invoke('restart_app');
+      } catch(e) {
+        document.getElementById('statusMsg').textContent = 'Restart error: ' + e;
+      }
+    }
+
+    // ── File cards ────────────────────────────────────────────────────────────
 
     function addCard(dup, orig, size, aiVerdict) {
       dupCount++;
@@ -283,24 +466,24 @@
     function removeCard(btn) {
       const card = btn.closest('.card');
       card.classList.add('removing');
+      const sz = parseInt(card.dataset.size) || 0;
+      totalSize = Math.max(0, totalSize - sz);
+      document.getElementById('spaceCount').textContent = formatSize(totalSize);
       setTimeout(() => card.remove(), 320);
     }
 
     async function doDelete(btn) {
       const card = btn.closest('.card');
       const path = card.dataset.path;
-      const size = parseInt(card.dataset.size) || 0;
       try {
         await invoke('delete_file', { path });
-        totalSize = Math.max(0, totalSize - size);
         deletedCount++;
-        document.getElementById('spaceCount').textContent = formatSize(totalSize);
         document.getElementById('deletedCount').textContent = deletedCount;
         document.getElementById('statusMsg').textContent = 'Deleted: ' + path;
         removeCard(btn);
         dupCount--;
         document.getElementById('dupCount').textContent = dupCount;
-      } catch (e) {
+      } catch(e) {
         document.getElementById('statusMsg').textContent = 'Error: ' + e;
       }
     }
@@ -322,15 +505,15 @@
         removeCard(btn);
         dupCount--;
         document.getElementById('dupCount').textContent = dupCount;
-      } catch (e) {
+      } catch(e) {
         document.getElementById('statusMsg').textContent = 'Error: ' + e;
       }
     }
 
-    // Wait for Tauri globals then register listeners
+    // ── Init ──────────────────────────────────────────────────────────────────
+
     async function setup() {
       try {
-        // Wait for window.__TAURI__ to be injected
         let attempts = 0;
         while (!window.__TAURI__ && attempts < 50) {
           await new Promise(r => setTimeout(r, 100));
@@ -340,28 +523,28 @@
           document.getElementById('statusMsg').textContent = 'ERROR: Tauri API not available';
           return;
         }
-        const inv = window.__TAURI__.core.invoke;
-        const lis = window.__TAURI__.event.listen;
-        document.getElementById('statusMsg').textContent = 'Tauri ready, registering listeners...';
 
-        await lis('duplicate-found', (e) => {
+        await listen('duplicate-found', (e) => {
           const { dup, orig, size, verdict } = e.payload;
           addCard(dup, orig, size || 0, verdict || 'delete');
         });
-        await lis('scan-path', (e) => {
-          document.getElementById('scanPath').textContent = e.payload;
+        await listen('scan-path', (e) => {
+          document.getElementById('scanText').textContent = 'Scanning: ' + e.payload;
         });
-        await lis('scan-complete', () => {
+        await listen('scan-complete', () => {
+          document.getElementById('spinner').classList.remove('active');
           document.getElementById('spinner').classList.add('done');
-          document.getElementById('scanText').textContent = 'Scan complete — ' + document.getElementById('scanPath').textContent;
+          document.getElementById('scanText').textContent = 'Scan complete';
           document.getElementById('statusMsg').textContent = 'Scan complete — ' + dupCount + ' duplicates found';
         });
-        document.getElementById('statusMsg').textContent = 'Waiting for AI suggestions...';
+
+        document.getElementById('statusMsg').textContent = 'Idle';
       } catch(err) {
         document.getElementById('statusMsg').textContent = 'ERROR: ' + err;
       }
     }
-    setup();
+
+    setup().then(() => loadPath());
   </script>
 </body>
 </html>

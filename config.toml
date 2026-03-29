@@ -2,7 +2,7 @@ title = "config-file"
 
 [directory]
 ## settings for the crawling actor to use	
-path = 'C:\Users\rohit\test_dupes'
+path = 'C:\Users\rohit\Downloads'
 last-accessed = ""
 
 [database]
@@ -13,4 +13,3 @@ batch-size = 15
 [LLM]
 ## etc variables here for LLM settings that we can tweak
 temp = 1.0
-

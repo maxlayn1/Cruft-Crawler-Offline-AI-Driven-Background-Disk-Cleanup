@@ -2,7 +2,7 @@ use steady_state::*;
 use std::time::Duration;
 use std::path::PathBuf;
 use std::sync::mpsc;
-use tauri::{Manager, Emitter};
+use tauri::{Manager, Emitter, AppHandle};
 
 pub(crate) mod actor {
     pub(crate) mod crawler;
@@ -16,6 +16,13 @@ const NAME_CRAWLER:  &str = "CRAWLER";
 const NAME_DB:       &str = "DB_MANAGER";
 const NAME_AI_MODEL: &str = "AI_MODEL";
 const NAME_UI_ACTOR: &str = "UI_ACTOR";
+
+// ── Tauri state: channel to trigger scan start ──────────────────────────────
+struct ScanTrigger {
+    tx: std::sync::Mutex<mpsc::Sender<()>>,
+}
+
+// ── Commands ────────────────────────────────────────────────────────────────
 
 #[tauri::command]
 fn delete_file(path: String) -> Result<(), String> {
@@ -32,9 +39,84 @@ fn never_delete_file(path: String) -> Result<(), String> {
     writeln!(f, "{}", path).map_err(|e| e.to_string())
 }
 
+#[tauri::command]
+fn get_scan_path() -> String {
+    let config_str = std::fs::read_to_string("./config.toml").unwrap_or_default();
+    let config: toml::Value = toml::from_str(&config_str)
+        .unwrap_or(toml::Value::Table(Default::default()));
+    config.get("directory")
+        .and_then(|d| d.get("path"))
+        .and_then(|p| p.as_str())
+        .unwrap_or(".")
+        .to_string()
+}
+
+#[tauri::command]
+fn set_scan_path(new_path: String) -> Result<(), String> {
+    let config_str = std::fs::read_to_string("./config.toml").unwrap_or_default();
+    let updated = if config_str.contains("path = ") {
+        let lines: Vec<String> = config_str.lines().map(|l| {
+            if l.trim().starts_with("path = ") {
+                format!("path = '{}'", new_path)
+            } else {
+                l.to_string()
+            }
+        }).collect();
+        lines.join("\n")
+    } else {
+        config_str
+    };
+    std::fs::write("./config.toml", updated).map_err(|e| e.to_string())
+}
+
+/// Returns a sorted list of entries in `path`.
+/// Directories are prefixed with "[DIR] ", files are plain names.
+#[tauri::command]
+fn list_folder(path: String) -> Vec<String> {
+    let mut entries = Vec::new();
+    if let Ok(dir) = std::fs::read_dir(&path) {
+        for entry in dir.flatten() {
+            let name = entry.file_name().to_string_lossy().to_string();
+            let is_dir = entry.file_type().map(|t| t.is_dir()).unwrap_or(false);
+            if is_dir {
+                entries.push(format!("[DIR] {}", name));
+            } else {
+                entries.push(name);
+            }
+        }
+    }
+    entries.sort_by(|a, b| {
+        let a_dir = a.starts_with("[DIR]");
+        let b_dir = b.starts_with("[DIR]");
+        b_dir.cmp(&a_dir).then(a.cmp(b))
+    });
+    entries
+}
+
+/// Fires off the steady_state graph (called when user clicks "Start Scan").
+#[tauri::command]
+fn start_scan(state: tauri::State<ScanTrigger>) -> Result<(), String> {
+    state.tx.lock()
+        .map_err(|e| e.to_string())?
+        .send(())
+        .map_err(|e| e.to_string())
+}
+
+/// Restarts the Tauri process.
+#[tauri::command]
+fn restart_app(app: AppHandle) {
+    app.restart();
+}
+
+// ── Entry point ──────────────────────────────────────────────────────────────
+
 fn main() {
     let (event_tx, event_rx) = mpsc::channel::<actor::web_ui::DuplicateEvent>();
+    let (scan_tx, scan_rx)   = mpsc::channel::<()>();
+
     tauri::Builder::default()
+        .plugin(tauri_plugin_dialog::init())
+        .manage(ScanTrigger { tx: std::sync::Mutex::new(scan_tx) })
         .setup(move |app| {
             let handle = app.handle().clone();
 
@@ -51,15 +133,23 @@ fn main() {
                 let _ = handle.emit("scan-complete", ());
             });
 
-            // Give the window 2 seconds to load before starting the graph
+            // Wait for the user to click "Start Scan" before launching the graph
             let handle2 = app.handle().clone();
             std::thread::spawn(move || {
-                std::thread::sleep(std::time::Duration::from_secs(2));
-                // Emit the scan path so the frontend can show it
+                // Block here until start_scan command fires
+                if scan_rx.recv().is_err() { return; }
+
+                // Tell the frontend which path we're scanning
                 let config_str = std::fs::read_to_string("./config.toml").unwrap_or_default();
-                let config: toml::Value = toml::from_str(&config_str).unwrap_or(toml::Value::Table(Default::default()));
-                let scan_path = config.get("directory").and_then(|d| d.get("path")).and_then(|p| p.as_str()).unwrap_or(".").to_string();
+                let config: toml::Value = toml::from_str(&config_str)
+                    .unwrap_or(toml::Value::Table(Default::default()));
+                let scan_path = config.get("directory")
+                    .and_then(|d| d.get("path"))
+                    .and_then(|p| p.as_str())
+                    .unwrap_or(".")
+                    .to_string();
                 let _ = handle2.emit("scan-path", scan_path);
+
                 let mut graph = GraphBuilder::default().build(());
                 build_graph(&mut graph, event_tx);
                 graph.start();
@@ -68,7 +158,15 @@ fn main() {
 
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![delete_file, never_delete_file])
+        .invoke_handler(tauri::generate_handler![
+            delete_file,
+            never_delete_file,
+            get_scan_path,
+            set_scan_path,
+            list_folder,
+            start_scan,
+            restart_app,
+        ])
         .run(tauri::generate_context!())
         .expect("Tauri error");
 }
