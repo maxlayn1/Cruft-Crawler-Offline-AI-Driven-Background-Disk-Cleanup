@@ -190,7 +190,7 @@
     </div>
     <div class="scan-status" id="scanStatus">
       <div class="spinner" id="spinner"></div>
-      <span id="scanText">Scanning...</span>
+      <span id="scanText">Scanning: <span id="scanPath">...</span></span>
     </div>
   </div>
 
@@ -348,9 +348,12 @@
           const { dup, orig, size, verdict } = e.payload;
           addCard(dup, orig, size || 0, verdict || 'delete');
         });
+        await lis('scan-path', (e) => {
+          document.getElementById('scanPath').textContent = e.payload;
+        });
         await lis('scan-complete', () => {
           document.getElementById('spinner').classList.add('done');
-          document.getElementById('scanText').textContent = 'Scan complete';
+          document.getElementById('scanText').textContent = 'Scan complete — ' + document.getElementById('scanPath').textContent;
           document.getElementById('statusMsg').textContent = 'Scan complete — ' + dupCount + ' duplicates found';
         });
         document.getElementById('statusMsg').textContent = 'Waiting for AI suggestions...';

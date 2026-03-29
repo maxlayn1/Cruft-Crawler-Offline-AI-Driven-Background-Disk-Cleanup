@@ -52,8 +52,14 @@ fn main() {
             });
 
             // Give the window 2 seconds to load before starting the graph
+            let handle2 = app.handle().clone();
             std::thread::spawn(move || {
                 std::thread::sleep(std::time::Duration::from_secs(2));
+                // Emit the scan path so the frontend can show it
+                let config_str = std::fs::read_to_string("./config.toml").unwrap_or_default();
+                let config: toml::Value = toml::from_str(&config_str).unwrap_or(toml::Value::Table(Default::default()));
+                let scan_path = config.get("directory").and_then(|d| d.get("path")).and_then(|p| p.as_str()).unwrap_or(".").to_string();
+                let _ = handle2.emit("scan-path", scan_path);
                 let mut graph = GraphBuilder::default().build(());
                 build_graph(&mut graph, event_tx);
                 graph.start();
