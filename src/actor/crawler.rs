@@ -3,6 +3,7 @@
 use steady_state::*;
 
 use std::path::{Path, PathBuf};
+use std::collections::HashMap;
 use sha2::{Sha256, Digest};
 use std::io::prelude::*;
 use walkdir::WalkDir;
@@ -67,8 +68,12 @@ impl FileMeta {
 
 
 // run function 
-pub async fn run(actor: SteadyActorShadow, crawler_tx: SteadyTx<FileMeta>, crawler_to_model_tx : SteadyTx<String>,
-                 state: SteadyState<CrawlerState>) -> Result<(),Box<dyn Error>> {
+pub async fn run(
+    actor: SteadyActorShadow,
+    crawler_tx: SteadyTx<FileMeta>,
+    crawler_to_model_tx: SteadyTx<String>,  // ← was SteadyTx<String>
+    state: SteadyState<CrawlerState>,
+) -> Result<(), Box<dyn std::error::Error>> {
 
     let actor = actor.into_spotlight([], [&crawler_tx, &crawler_to_model_tx]);
 
@@ -80,41 +85,118 @@ pub async fn run(actor: SteadyActorShadow, crawler_tx: SteadyTx<FileMeta>, crawl
 }
 
 
-// Internal behaviour for the actor
-async fn internal_behavior<A: SteadyActor>(mut actor: A, crawler_tx: SteadyTx<FileMeta>, crawler_to_ai_model_tx : SteadyTx<String>,
-                                           state: SteadyState<CrawlerState>) -> Result<(),Box<dyn Error>> {
+/// Change internal_behavior signature to match:
+async fn internal_behavior<A: SteadyActor>(
+    mut actor: A,
+    crawler_tx: SteadyTx<FileMeta>,
+    crawler_to_ai_model_tx: SteadyTx<String>,  
+    state: SteadyState<CrawlerState>,
+) -> Result<(), Box<dyn std::error::Error>> {
 
     // lock state
     let mut state = state.lock(|| CrawlerState{abs_path: PathBuf::new(),
-					       hash: String::new()}).await;
+                                               hash: String::new()}).await;
 
     let mut crawler_tx = crawler_tx.lock().await;
     let mut crawler_to_ai_model_tx = crawler_to_ai_model_tx.lock().await;
 
-    let path1 = Path::new("./src/test_directory/");
+    let config_str = std::fs::read_to_string("./config.toml").unwrap_or_default();
+    let config: toml::Value = toml::from_str(&config_str).unwrap_or(toml::Value::Table(Default::default()));
+    let crawl_path_str = config
+        .get("directory")
+        .and_then(|d| d.get("path"))
+        .and_then(|p| p.as_str())
+        .unwrap_or(".")
+        .to_string();
+    let crawl_path_str = if crawl_path_str.trim().is_empty() { ".".to_string() } else { crawl_path_str };
+    let crawl_path = PathBuf::from(&crawl_path_str);
 
-    // TODO: change value of state inside this function before pushing metadata
-    // NOTE: state passed in as mutable reference  &StateGuard<'_, CrawlerState>
-    let metas: Vec<FileMeta> = visit_dir(path1, &state)?;
-    
+    let mut seen_hashes: std::collections::HashMap<String, String> = std::collections::HashMap::new();
     while actor.is_running(|| crawler_tx.mark_closed()) {
+        for entry_res in WalkDir::new(&crawl_path) {
+            let entry = match entry_res {
+                Ok(e) => e,
+                Err(_) => continue,
+            };
 
-        //Sending data to ai actor
-        actor.wait_vacant(&mut crawler_to_ai_model_tx, 1).await;
-        let message = "Hello".to_string();
-        actor.try_send(&mut crawler_to_ai_model_tx, message);
-        
-        //sending data to database actor
-        for m in &metas {
-            actor.wait_vacant(&mut crawler_tx, 1).await; 
-            let message = m.clone();
-            actor.try_send(&mut crawler_tx, message).expect("couldn't send to DB");
-	    }
-        
-        //actor.request_shutdown().await; //comment out this line to make the program have an infinite loop.
+            let rel_path = entry.path().to_path_buf();
+            let abs_path: PathBuf = match std::path::absolute(&rel_path) {
+                Ok(p) => p,
+                Err(_) => continue,
+            };
 
-    } 
-	return Ok(());
+            let file_name: String = match entry.file_name().to_str() {
+                Some(s) => s.to_owned(),
+                None => entry.file_name().to_string_lossy().into_owned(),
+            };
+
+            let md = match entry.metadata() {
+                Ok(m) => m,
+                Err(_) => continue,
+            };
+
+            let is_file = md.is_file();
+            let size = md.len();
+            let modified = FileTime::from_last_modification_time(&md).seconds();
+            let created = match FileTime::from_creation_time(&md) {
+                Some(t) => t.seconds(),
+                None => 0,
+            };
+            let readonly = md.permissions().readonly();
+
+            let hash = if is_file {
+                match get_file_hash(abs_path.clone()) {
+                    Ok(h) => h,
+                    Err(_) => continue,
+                }
+            } else {
+                String::new()
+            };
+
+            let file_meta = FileMeta {
+                rel_path,
+                abs_path: abs_path.clone(),
+                file_name,
+                hash: hash.clone(),
+                is_file,
+                size,
+                modified,
+                created,
+                readonly,
+            };
+
+            // Send to DB
+            actor.wait_vacant(&mut crawler_tx, 1).await;
+            match actor.try_send(&mut crawler_tx, file_meta) {
+                SendOutcome::Success => {}
+                SendOutcome::Blocked(_) => {}
+                _ => {}
+            }
+
+            // Send path to AI model — only for duplicates
+            if is_file && size > 0 && !hash.is_empty() {
+                let dup_path = abs_path.to_string_lossy().to_string();
+                if let Some(orig_path) = seen_hashes.get(&hash) {
+                    let msg = format!("{}|{}", dup_path, orig_path);
+                    actor.wait_vacant(&mut crawler_to_ai_model_tx, 1).await;
+                    match actor.try_send(&mut crawler_to_ai_model_tx, msg) {
+                        SendOutcome::Success => {}
+                        SendOutcome::Blocked(_) => {}
+                        _ => {}
+                    }
+                } else {
+                    seen_hashes.insert(hash.clone(), dup_path);
+                }
+            }
+
+            // Throttle CPU usage to stay well below 15%
+            std::thread::sleep(std::time::Duration::from_millis(10));
+        }
+        // Crawl complete - stop
+        break;
+    }
+
+    Ok(())
 }
 
 
@@ -152,9 +234,15 @@ pub fn visit_dir(dir: &Path,
 
     // Read the directory (non-recursive)
     for entry_res in WalkDir::new(dir) {
-        let entry = entry_res?;
+        let entry = match entry_res {
+            Ok(e) => e,
+            Err(_) => continue,
+        };
         let rel_path: &Path = entry.path();
-	let abs_path: PathBuf = std::path::absolute(&rel_path)?;
+	let abs_path: PathBuf = match std::path::absolute(&rel_path) {
+	    Ok(p) => p,
+	    Err(_) => continue,
+	};
 
 	// convert relative path to Pathbuf for printing
 	let rel_path: PathBuf = rel_path.to_path_buf();
@@ -173,29 +261,40 @@ pub fn visit_dir(dir: &Path,
                 let is_file:  bool   = md.is_file();
                 let size:     u64    = md.len();
                 let modified: i64    = FileTime::from_last_modification_time(&md).seconds();
-                let created:  i64    = FileTime::from_creation_time(&md).expect("created file time").seconds();
+                let created: i64 = match FileTime::from_creation_time(&md) {
+                    Some(t) => t.seconds(),
+                    None => 0,
+                };
                 let readonly: bool   = md.permissions().readonly();
 		let mut hash: String = String::new();
 
 		if is_file {
-		hash = get_file_hash(abs_path.clone()).expect("didn't get hash value");
-		}
-
-                metas.push(FileMeta {
-		    rel_path,
-		    abs_path,
-                    file_name,
-		    hash, 
-                    is_file,
-                    size,
-                    modified, 
-                    created,
-                    readonly,
-                });
+            match get_file_hash(abs_path.clone()) {
+                Ok(h) => {
+                    hash = h;
+                }
+                Err(e) => {
+                    //eprintln!("Skipping locked/unreadable file {:?}: {}", abs_path, e);
+                    continue; // skip this entry and move on
+                }
             }
-            Err(e) => {
+        }
+
+        metas.push(FileMeta {
+		        rel_path,
+		        abs_path,
+                file_name,
+		        hash, 
+                is_file,
+                size,
+                modified, 
+                created,
+                readonly,
+            });
+        }
+        Err(e) => {
 		// TODO: log errors here
-                eprintln!("warning: cannot stat {}: {}", file_name, e);
+                //eprintln!("warning: cannot stat {}: {}", file_name, e);
             }
         }
     }

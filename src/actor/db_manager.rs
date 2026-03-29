@@ -3,6 +3,8 @@
 use steady_state::*;
 use std::error::Error;
 use crate::actor::crawler::FileMeta;
+use std::path::PathBuf;
+use std::fs;
 
 
 // size of batch we want (# of FileMeta Structs before writing to DB)
@@ -10,41 +12,68 @@ const BATCH_SIZE: usize = 1;
 
 pub async fn run(actor: SteadyActorShadow, 
                  crawler_to_db_rx: SteadyRx<FileMeta>,
-                 file_handler_to_db_rx: SteadyRx<String> ) -> Result<(),Box<dyn Error>> {
+                 ui_to_db_rx: SteadyRx<String> ) -> Result<(),Box<dyn Error>> {
 
-    let actor = actor.into_spotlight([&crawler_to_db_rx, &file_handler_to_db_rx], []);
-	internal_behavior(actor, crawler_to_db_rx, file_handler_to_db_rx).await
+    let actor = actor.into_spotlight([&crawler_to_db_rx, &ui_to_db_rx], []);
+	internal_behavior(actor, crawler_to_db_rx, ui_to_db_rx).await
 }
 
 
 async fn internal_behavior<A: SteadyActor>(mut actor: A, 
                                                 crawler_to_db_rx: SteadyRx<FileMeta>, 
-                                                file_handler_to_db_rx: SteadyRx<String>) -> Result<(),Box<dyn Error>> {
+                                                ui_to_db_rx: SteadyRx<String>) -> Result<(),Box<dyn Error>> {
 
     let mut crawler_to_db_rx = crawler_to_db_rx.lock().await;
 
-    let mut file_handler_to_db_rx = file_handler_to_db_rx.lock().await;
-
+    let mut ui_to_db_rx = ui_to_db_rx.lock().await;
 
     // TODO: example code that I need to change
     let mut db: sled::Db = sled::open("./src/db").unwrap();
-    let ctr: i32 = 0;
+    let mut ctr: i32 = 0;
 
     while actor.is_running(|| crawler_to_db_rx.is_closed_and_empty()) {
-
-        //Recieving data from ui actor
-	    actor.wait_avail(&mut file_handler_to_db_rx, 1).await;
-        let recieved = actor.try_take(&mut file_handler_to_db_rx);
-	    let message = recieved.expect("Expected a string");
-
-        //Recieving from crawler actor
-	    actor.wait_avail(&mut crawler_to_db_rx, BATCH_SIZE).await;
-	    let recieved = actor.try_take(&mut crawler_to_db_rx);
-
-	    let msg = recieved.expect("expected FileMeta Struct (db_actor)");
-	    let _ = db_add(ctr, msg.clone(), &db);
-	    msg.meta_print();
-	}
+        // 1) Wait until there is at least one FileMeta from the crawler
+        actor.wait_avail(&mut crawler_to_db_rx, BATCH_SIZE).await;
+    
+        
+        // Handle any confirmed user deletions from UI
+        if let Some(cmd) = actor.try_take(&mut ui_to_db_rx) {
+            let path = cmd.trim_start_matches("delete::");
+            println!("User confirmed deletion: {:?}", path);
+            match fs::remove_file(path) {
+                Ok(_) => {
+                    println!("Deleted from disk: {:?}", path);
+                    // Remove matching entry from sled DB
+                    for result in db.iter() {
+                        if let Ok((key, val)) = result {
+                            if let Ok(meta) = FileMeta::from_bytes(&val) {
+                                if meta.abs_path.to_string_lossy() == path {
+                                    let _ = db.remove(key);
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+                Err(e) => eprintln!("Failed to delete {:?}: {}", path, e),
+            }
+        }
+    
+        // 3) Drain up to BATCH_SIZE items from crawler_to_db_rx
+        for _ in 0..BATCH_SIZE {
+            match actor.try_take(&mut crawler_to_db_rx) {
+                Some(file_meta) => {
+                    let _ = db_add(ctr, file_meta.clone(), &db);
+                    ctr += 1;
+                    //file_meta.meta_print();
+                }
+                None => {
+                    // nothing more to read right now
+                    break;
+                }
+            }
+        }
+    }
     
   Ok(())
 }
