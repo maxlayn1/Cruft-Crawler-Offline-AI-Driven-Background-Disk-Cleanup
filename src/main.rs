@@ -148,9 +148,11 @@ fn start_scan(state: tauri::State<ScanTrigger>, stop: tauri::State<StopFlag>) ->
 }
 
 /// Stops the in-progress scan. The resume position is preserved.
+/// Emits "scan-stopped" immediately so the UI updates without waiting.
 #[tauri::command]
-fn stop_scan(stop: tauri::State<StopFlag>) {
+fn stop_scan(stop: tauri::State<StopFlag>, app: AppHandle) {
     stop.0.store(true, Ordering::Relaxed);
+    let _ = app.emit("scan-stopped", ());
 }
 
 /// Restarts the Tauri process.
@@ -220,11 +222,8 @@ fn main() {
                     graph.start();
                     let _ = graph.block_until_stopped(Duration::from_secs(1));
 
-                    // Notify frontend whether we finished or were stopped
-                    if stop_flag2.load(Ordering::Relaxed) {
-                        let _ = handle2.emit("scan-stopped", ());
-                    } else {
-                        // Clear resume position so a fresh scan starts next time
+                    // Only emit scan-complete on natural finish (stop already emitted by stop_scan command)
+                    if !stop_flag2.load(Ordering::Relaxed) {
                         *resume_from2.lock().unwrap() = String::new();
                         let _ = handle2.emit("scan-complete", ());
                     }

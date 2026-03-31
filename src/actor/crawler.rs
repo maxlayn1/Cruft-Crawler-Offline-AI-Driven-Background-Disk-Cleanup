@@ -171,9 +171,16 @@ async fn internal_behavior<A: SteadyActor>(
 
             let is_file = md.is_file();
 
-            // Resume: skip files until we reach (and pass) the last processed path
+            // Resume: skip files until we reach the last processed path.
+            // Still hash skipped files so seen_hashes is rebuilt correctly
+            // (without this, duplicates of pre-resume files would be missed).
             if skipping && is_file {
                 let path_str = abs_path.to_string_lossy().to_string();
+                if let Ok(h) = get_file_hash(abs_path.clone()) {
+                    if !h.is_empty() {
+                        seen_hashes.entry(h).or_insert(path_str.clone());
+                    }
+                }
                 if path_str == resume_path {
                     skipping = false; // found our position; next file will be processed
                 }
