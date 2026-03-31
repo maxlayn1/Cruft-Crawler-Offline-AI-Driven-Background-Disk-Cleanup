@@ -107,40 +107,31 @@
     }
     .path-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
-    /* ── Folder Preview ── */
-    .folder-preview {
-      background: #0f0f1a;
+    /* ── Folder Info Bar ── */
+    .folder-info {
+      background: #0c0c18;
       border-bottom: 1px solid #1e1e35;
       padding: 0 28px;
       max-height: 0;
       overflow: hidden;
-      transition: max-height 0.3s ease, padding 0.3s ease;
+      transition: max-height 0.25s ease;
       flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      gap: 20px;
     }
-    .folder-preview.open {
-      max-height: 160px;
-      padding: 10px 28px;
+    .folder-info.open {
+      max-height: 40px;
     }
-    .preview-label {
-      font-size: 11px; color: #555; text-transform: uppercase;
-      letter-spacing: 0.5px; margin-bottom: 6px;
+    .info-chip {
+      font-size: 12px;
+      color: #666;
+      display: flex;
+      align-items: center;
+      gap: 5px;
     }
-    .preview-list {
-      display: flex; flex-wrap: wrap; gap: 6px;
-      max-height: 110px; overflow-y: auto;
-    }
-    .preview-list::-webkit-scrollbar { width: 4px; }
-    .preview-list::-webkit-scrollbar-thumb { background: #2a2a4a; border-radius: 2px; }
-    .preview-item {
-      font-size: 11px;
-      background: #1a1a2e;
-      border: 1px solid #252545;
-      border-radius: 4px;
-      padding: 3px 8px;
-      color: #aaa;
-      white-space: nowrap;
-    }
-    .preview-item.dir { color: #7eb8f7; border-color: #1a3a5a; }
+    .info-chip strong { color: #aaa; font-weight: 600; }
+    .info-chip.highlight strong { color: #7eb8f7; }
 
     /* ── Stats Bar ── */
     .stats-bar {
@@ -277,13 +268,15 @@
     <input class="path-input" id="pathInput" type="text" placeholder="Enter folder path or click Browse..." />
     <button class="path-btn" onclick="browsePath()">&#128193; Browse</button>
     <button class="path-btn start" id="startBtn" onclick="doStartScan()">&#9654; Start Scan</button>
+    <button class="path-btn" id="stopBtn" onclick="doStopScan()" style="display:none;background:#4a2a1a;color:#e8935a;">&#9632; Stop Scan</button>
     <button class="path-btn danger" onclick="doRestart()">&#8635; Apply &amp; Restart</button>
   </div>
 
-  <!-- Folder Preview -->
-  <div class="folder-preview" id="folderPreview">
-    <div class="preview-label">Folder contents</div>
-    <div class="preview-list" id="previewList"></div>
+  <!-- Folder Info Bar -->
+  <div class="folder-info" id="folderInfo">
+    <div class="info-chip" id="infoFiles">&#128196; <span>—</span></div>
+    <div class="info-chip highlight" id="infoSize">&#128190; <strong>—</strong></div>
+    <div class="info-chip" id="infoNote" style="color:#444;font-style:italic;font-size:11px"></div>
   </div>
 
   <!-- Stats -->
@@ -337,27 +330,26 @@
       return path.replace(/\\/g, '/').split('/').pop();
     }
 
-    // ── Folder preview ────────────────────────────────────────────────────────
+    // ── Folder info bar ───────────────────────────────────────────────────────
 
-    async function showFolderPreview(path) {
+    async function showFolderInfo(path) {
       if (!path) return;
+      const bar = document.getElementById('folderInfo');
+      document.getElementById('infoFiles').innerHTML = '&#128196; <span style="color:#555">Calculating...</span>';
+      document.getElementById('infoSize').innerHTML = '&#128190; <strong style="color:#555">—</strong>';
+      document.getElementById('infoNote').textContent = '';
+      bar.classList.add('open');
       try {
-        const entries = await invoke('list_folder', { path });
-        const list = document.getElementById('previewList');
-        list.innerHTML = '';
-        if (entries.length === 0) {
-          list.innerHTML = '<span style="color:#444;font-size:12px">Empty folder</span>';
-        } else {
-          entries.forEach(name => {
-            const span = document.createElement('span');
-            span.className = 'preview-item' + (name.startsWith('[DIR]') ? ' dir' : '');
-            span.textContent = name;
-            list.appendChild(span);
-          });
+        const info = await invoke('get_folder_info', { path });
+        document.getElementById('infoFiles').innerHTML =
+          '&#128196; <strong>' + info.file_count.toLocaleString() + (info.capped ? '+' : '') + '</strong> files';
+        document.getElementById('infoSize').innerHTML =
+          '&#128190; <strong>' + formatSize(info.total_bytes) + '</strong> total size';
+        if (info.capped) {
+          document.getElementById('infoNote').textContent = '(large folder — capped at 100k files)';
         }
-        document.getElementById('folderPreview').classList.add('open');
       } catch(e) {
-        console.warn('list_folder error:', e);
+        bar.classList.remove('open');
       }
     }
 
@@ -369,7 +361,7 @@
         const selected = await dialog.open({ directory: true, multiple: false, title: 'Select folder to scan' });
         if (selected) {
           document.getElementById('pathInput').value = selected;
-          await showFolderPreview(selected);
+          await showFolderInfo(selected);
         }
       } catch(e) {
         document.getElementById('statusMsg').textContent = 'Error opening dialog: ' + e;
@@ -380,8 +372,20 @@
       try {
         const p = await invoke('get_scan_path');
         document.getElementById('pathInput').value = p;
-        await showFolderPreview(p);
+        // Do NOT show folder info on startup — only after user explicitly browses
       } catch(e) {}
+    }
+
+    function setScanningUI(scanning, resumed) {
+      scanStarted = scanning;
+      document.getElementById('startBtn').style.display = scanning ? 'none' : '';
+      document.getElementById('stopBtn').style.display  = scanning ? '' : 'none';
+      if (scanning) {
+        document.getElementById('spinner').classList.add('active');
+        document.getElementById('spinner').classList.remove('done');
+      } else {
+        document.getElementById('spinner').classList.remove('active');
+      }
     }
 
     async function doStartScan() {
@@ -397,11 +401,9 @@
       // Save path first
       try { await invoke('set_scan_path', { newPath: p }); } catch(e) {}
 
-      // Close preview, update UI
-      document.getElementById('folderPreview').classList.remove('open');
-      scanStarted = true;
-      document.getElementById('startBtn').disabled = true;
-      document.getElementById('spinner').classList.add('active');
+      // Close info bar, update UI
+      document.getElementById('folderInfo').classList.remove('open');
+      setScanningUI(true);
       document.getElementById('scanText').textContent = 'Scanning: ' + p;
       document.getElementById('statusMsg').textContent = 'Scan started...';
 
@@ -409,7 +411,13 @@
         await invoke('start_scan');
       } catch(e) {
         document.getElementById('statusMsg').textContent = 'Error starting scan: ' + e;
+        setScanningUI(false);
       }
+    }
+
+    async function doStopScan() {
+      document.getElementById('statusMsg').textContent = 'Stopping scan — saving position...';
+      try { await invoke('stop_scan'); } catch(e) {}
     }
 
     async function doRestart() {
@@ -532,10 +540,15 @@
           document.getElementById('scanText').textContent = 'Scanning: ' + e.payload;
         });
         await listen('scan-complete', () => {
-          document.getElementById('spinner').classList.remove('active');
+          setScanningUI(false);
           document.getElementById('spinner').classList.add('done');
           document.getElementById('scanText').textContent = 'Scan complete';
           document.getElementById('statusMsg').textContent = 'Scan complete — ' + dupCount + ' duplicates found';
+        });
+        await listen('scan-stopped', () => {
+          setScanningUI(false);
+          document.getElementById('scanText').textContent = 'Scan paused — click Start Scan to resume';
+          document.getElementById('statusMsg').textContent = 'Scan stopped. Position saved — click Start Scan to continue from where it left off.';
         });
 
         document.getElementById('statusMsg').textContent = 'Idle';

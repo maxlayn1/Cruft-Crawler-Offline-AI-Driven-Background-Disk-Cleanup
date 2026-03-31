@@ -1,8 +1,10 @@
 use steady_state::*;
 use std::time::Duration;
 use std::path::PathBuf;
-use std::sync::mpsc;
+use std::sync::{mpsc, Arc, Mutex};
+use std::sync::atomic::{AtomicBool, Ordering};
 use tauri::{Manager, Emitter, AppHandle};
+use walkdir::WalkDir;
 
 pub(crate) mod actor {
     pub(crate) mod crawler;
@@ -17,12 +19,29 @@ const NAME_DB:       &str = "DB_MANAGER";
 const NAME_AI_MODEL: &str = "AI_MODEL";
 const NAME_UI_ACTOR: &str = "UI_ACTOR";
 
-// ── Tauri state: channel to trigger scan start ──────────────────────────────
+// ── Tauri shared state ───────────────────────────────────────────────────────
+
 struct ScanTrigger {
-    tx: std::sync::Mutex<mpsc::Sender<()>>,
+    tx: Mutex<mpsc::Sender<()>>,
 }
 
-// ── Commands ────────────────────────────────────────────────────────────────
+struct StopFlag(Arc<AtomicBool>);
+
+/// Tracks the last fully-processed file path so a stopped scan can resume.
+struct ResumeFrom(Arc<Mutex<String>>);
+
+// ── Directory exclusion list (same as crawler) ───────────────────────────────
+
+const SKIP_DIRS: &[&str] = &[
+    ".git", ".svn", ".hg",
+    "node_modules", "target",
+    "Library", "Temp", "Artifacts", "PackageCache", "ShaderCache",
+    ".vs", ".idea", "__pycache__",
+    "obj", "bin",
+    ".cache", ".next", "dist", "build",
+];
+
+// ── Commands ─────────────────────────────────────────────────────────────────
 
 #[tauri::command]
 fn delete_file(path: String) -> Result<(), String> {
@@ -69,8 +88,36 @@ fn set_scan_path(new_path: String) -> Result<(), String> {
     std::fs::write("./config.toml", updated).map_err(|e| e.to_string())
 }
 
-/// Returns a sorted list of entries in `path`.
-/// Directories are prefixed with "[DIR] ", files are plain names.
+#[derive(serde::Serialize)]
+struct FolderInfo {
+    file_count: u64,
+    total_bytes: u64,
+    capped: bool,
+}
+
+/// Walk ALL of `path` (no exclusions) and return total file count + size,
+/// matching what Windows Explorer reports.
+#[tauri::command]
+fn get_folder_info(path: String) -> FolderInfo {
+    let mut file_count = 0u64;
+    let mut total_bytes = 0u64;
+    let mut capped = false;
+    const MAX_FILES: u64 = 500_000;
+
+    for entry in WalkDir::new(&path).into_iter().flatten() {
+        if entry.file_type().is_file() {
+            file_count += 1;
+            total_bytes += entry.metadata().map(|m| m.len()).unwrap_or(0);
+            if file_count >= MAX_FILES {
+                capped = true;
+                break;
+            }
+        }
+    }
+    FolderInfo { file_count, total_bytes, capped }
+}
+
+/// Returns a sorted list of immediate children in `path`.
 #[tauri::command]
 fn list_folder(path: String) -> Vec<String> {
     let mut entries = Vec::new();
@@ -78,11 +125,7 @@ fn list_folder(path: String) -> Vec<String> {
         for entry in dir.flatten() {
             let name = entry.file_name().to_string_lossy().to_string();
             let is_dir = entry.file_type().map(|t| t.is_dir()).unwrap_or(false);
-            if is_dir {
-                entries.push(format!("[DIR] {}", name));
-            } else {
-                entries.push(name);
-            }
+            entries.push(if is_dir { format!("[DIR] {}", name) } else { name });
         }
     }
     entries.sort_by(|a, b| {
@@ -93,13 +136,21 @@ fn list_folder(path: String) -> Vec<String> {
     entries
 }
 
-/// Fires off the steady_state graph (called when user clicks "Start Scan").
+/// Signals the graph thread to start (or resume) scanning.
 #[tauri::command]
-fn start_scan(state: tauri::State<ScanTrigger>) -> Result<(), String> {
+fn start_scan(state: tauri::State<ScanTrigger>, stop: tauri::State<StopFlag>) -> Result<(), String> {
+    // Clear any previous stop so the crawler runs
+    stop.0.store(false, Ordering::Relaxed);
     state.tx.lock()
         .map_err(|e| e.to_string())?
         .send(())
         .map_err(|e| e.to_string())
+}
+
+/// Stops the in-progress scan. The resume position is preserved.
+#[tauri::command]
+fn stop_scan(stop: tauri::State<StopFlag>) {
+    stop.0.store(true, Ordering::Relaxed);
 }
 
 /// Restarts the Tauri process.
@@ -108,19 +159,25 @@ fn restart_app(app: AppHandle) {
     app.restart();
 }
 
-// ── Entry point ──────────────────────────────────────────────────────────────
+// ── Entry point ───────────────────────────────────────────────────────────────
 
 fn main() {
     let (event_tx, event_rx) = mpsc::channel::<actor::web_ui::DuplicateEvent>();
     let (scan_tx, scan_rx)   = mpsc::channel::<()>();
 
+    let stop_flag   = Arc::new(AtomicBool::new(false));
+    let resume_from = Arc::new(Mutex::new(String::new()));
+
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
-        .manage(ScanTrigger { tx: std::sync::Mutex::new(scan_tx) })
+        .manage(ScanTrigger { tx: Mutex::new(scan_tx) })
+        .manage(StopFlag(stop_flag.clone()))
+        .manage(ResumeFrom(resume_from.clone()))
         .setup(move |app| {
             let handle = app.handle().clone();
 
-            // Bridge: forward actor events to Tauri window events
+            // Bridge: forward actor events to Tauri window events (runs forever)
+            let _event_tx_keep = event_tx.clone(); // keep channel open across graph rebuilds
             std::thread::spawn(move || {
                 while let Ok(ev) = event_rx.recv() {
                     let _ = handle.emit("duplicate-found", serde_json::json!({
@@ -130,30 +187,48 @@ fn main() {
                         "verdict": ev.verdict,
                     }));
                 }
-                let _ = handle.emit("scan-complete", ());
             });
 
-            // Wait for the user to click "Start Scan" before launching the graph
-            let handle2 = app.handle().clone();
+            // Graph control thread — loops so the user can stop and resume
+            let handle2      = app.handle().clone();
+            let stop_flag2   = stop_flag.clone();
+            let resume_from2 = resume_from.clone();
             std::thread::spawn(move || {
-                // Block here until start_scan command fires
-                if scan_rx.recv().is_err() { return; }
+                while let Ok(()) = scan_rx.recv() {
+                    // Reset stop flag (start_scan already does this, belt-and-suspenders)
+                    stop_flag2.store(false, Ordering::Relaxed);
 
-                // Tell the frontend which path we're scanning
-                let config_str = std::fs::read_to_string("./config.toml").unwrap_or_default();
-                let config: toml::Value = toml::from_str(&config_str)
-                    .unwrap_or(toml::Value::Table(Default::default()));
-                let scan_path = config.get("directory")
-                    .and_then(|d| d.get("path"))
-                    .and_then(|p| p.as_str())
-                    .unwrap_or(".")
-                    .to_string();
-                let _ = handle2.emit("scan-path", scan_path);
+                    // Tell the frontend which path we're scanning
+                    let config_str = std::fs::read_to_string("./config.toml").unwrap_or_default();
+                    let config: toml::Value = toml::from_str(&config_str)
+                        .unwrap_or(toml::Value::Table(Default::default()));
+                    let scan_path = config.get("directory")
+                        .and_then(|d| d.get("path"))
+                        .and_then(|p| p.as_str())
+                        .unwrap_or(".")
+                        .to_string();
+                    let _ = handle2.emit("scan-path", &scan_path);
 
-                let mut graph = GraphBuilder::default().build(());
-                build_graph(&mut graph, event_tx);
-                graph.start();
-                graph.block_until_stopped(Duration::from_secs(1));
+                    // Build and run the graph
+                    let mut graph = GraphBuilder::default().build(());
+                    build_graph(
+                        &mut graph,
+                        event_tx.clone(),
+                        stop_flag2.clone(),
+                        resume_from2.clone(),
+                    );
+                    graph.start();
+                    let _ = graph.block_until_stopped(Duration::from_secs(1));
+
+                    // Notify frontend whether we finished or were stopped
+                    if stop_flag2.load(Ordering::Relaxed) {
+                        let _ = handle2.emit("scan-stopped", ());
+                    } else {
+                        // Clear resume position so a fresh scan starts next time
+                        *resume_from2.lock().unwrap() = String::new();
+                        let _ = handle2.emit("scan-complete", ());
+                    }
+                }
             });
 
             Ok(())
@@ -163,24 +238,31 @@ fn main() {
             never_delete_file,
             get_scan_path,
             set_scan_path,
+            get_folder_info,
             list_folder,
             start_scan,
+            stop_scan,
             restart_app,
         ])
         .run(tauri::generate_context!())
         .expect("Tauri error");
 }
 
-fn build_graph(graph: &mut Graph, event_tx: mpsc::Sender<actor::web_ui::DuplicateEvent>) {
+fn build_graph(
+    graph: &mut Graph,
+    event_tx: mpsc::Sender<actor::web_ui::DuplicateEvent>,
+    stop_flag: Arc<AtomicBool>,
+    resume_from: Arc<Mutex<String>>,
+) {
     let channel_builder = graph.channel_builder()
         .with_filled_trigger(Trigger::AvgAbove(Filled::p90()), AlertColor::Red)
         .with_filled_trigger(Trigger::AvgAbove(Filled::p60()), AlertColor::Orange)
         .with_filled_percentile(Percentile::p80());
 
-    let (crawler_to_db_tx, crawler_to_db_rx) = channel_builder.build();
+    let (crawler_to_db_tx, crawler_to_db_rx)           = channel_builder.build();
     let (crawler_to_ai_model_tx, crawler_to_ai_model_rx) = channel_builder.build();
-    let (ai_model_to_ui_tx, ai_model_to_ui_rx) = channel_builder.build();
-    let (ui_to_db_tx, ui_to_db_rx) = channel_builder.build();
+    let (ai_model_to_ui_tx, ai_model_to_ui_rx)         = channel_builder.build();
+    let (ui_to_db_tx, ui_to_db_rx)                     = channel_builder.build();
 
     let actor_builder = graph.actor_builder()
         .with_load_avg()
@@ -193,6 +275,8 @@ fn build_graph(graph: &mut Graph, event_tx: mpsc::Sender<actor::web_ui::Duplicat
             crawler_to_db_tx.clone(),
             crawler_to_ai_model_tx.clone(),
             state.clone(),
+            stop_flag.clone(),
+            resume_from.clone(),
         ), SoloAct);
 
     actor_builder.with_name(NAME_DB)

@@ -2,7 +2,7 @@ title = "config-file"
 
 [directory]
 ## settings for the crawling actor to use	
-path = 'C:\Users\rohit\Downloads'
+path = 'C:\Study\Project\CS_499\Cruft_Crawler\Cruft-Crawler-Offline-AI-Driven-Background-Disk-Cleanup'
 last-accessed = ""
 
 [database]

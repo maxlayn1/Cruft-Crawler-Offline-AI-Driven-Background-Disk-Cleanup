@@ -4,6 +4,8 @@ use steady_state::*;
 
 use std::path::{Path, PathBuf};
 use std::collections::HashMap;
+use std::sync::{Arc, Mutex};
+use std::sync::atomic::{AtomicBool, Ordering};
 use sha2::{Sha256, Digest};
 use std::io::prelude::*;
 use walkdir::WalkDir;
@@ -71,14 +73,16 @@ impl FileMeta {
 pub async fn run(
     actor: SteadyActorShadow,
     crawler_tx: SteadyTx<FileMeta>,
-    crawler_to_model_tx: SteadyTx<String>,  // ← was SteadyTx<String>
+    crawler_to_model_tx: SteadyTx<String>,
     state: SteadyState<CrawlerState>,
+    stop_flag: Arc<AtomicBool>,
+    resume_from: Arc<Mutex<String>>,
 ) -> Result<(), Box<dyn std::error::Error>> {
 
     let actor = actor.into_spotlight([], [&crawler_tx, &crawler_to_model_tx]);
 
 	if actor.use_internal_behavior {
-	    internal_behavior(actor, crawler_tx,crawler_to_model_tx, state).await
+	    internal_behavior(actor, crawler_tx, crawler_to_model_tx, state, stop_flag, resume_from).await
 	} else {
 	    actor.simulated_behavior(vec!(&crawler_tx)).await
 	}
@@ -89,8 +93,10 @@ pub async fn run(
 async fn internal_behavior<A: SteadyActor>(
     mut actor: A,
     crawler_tx: SteadyTx<FileMeta>,
-    crawler_to_ai_model_tx: SteadyTx<String>,  
+    crawler_to_ai_model_tx: SteadyTx<String>,
     state: SteadyState<CrawlerState>,
+    stop_flag: Arc<AtomicBool>,
+    resume_from: Arc<Mutex<String>>,
 ) -> Result<(), Box<dyn std::error::Error>> {
 
     // lock state
@@ -111,9 +117,37 @@ async fn internal_behavior<A: SteadyActor>(
     let crawl_path_str = if crawl_path_str.trim().is_empty() { ".".to_string() } else { crawl_path_str };
     let crawl_path = PathBuf::from(&crawl_path_str);
 
+    // Directories to skip entirely (build caches, VCS, package managers, etc.)
+    const SKIP_DIRS: &[&str] = &[
+        ".git", ".svn", ".hg",
+        "node_modules", "target",
+        "Library", "Temp", "Artifacts", "PackageCache", "ShaderCache",
+        ".vs", ".idea", "__pycache__",
+        "obj", "bin",
+        ".cache", ".next", "dist", "build",
+    ];
+
+    // Resume: get the last file path we processed in a previous (stopped) run
+    let resume_path = resume_from.lock().unwrap().clone();
+    let mut skipping = !resume_path.is_empty();
+
     let mut seen_hashes: std::collections::HashMap<String, String> = std::collections::HashMap::new();
     while actor.is_running(|| crawler_tx.mark_closed()) {
-        for entry_res in WalkDir::new(&crawl_path) {
+        'scan: for entry_res in WalkDir::new(&crawl_path)
+            .into_iter()
+            .filter_entry(|e| {
+                if e.file_type().is_dir() {
+                    let name = e.file_name().to_str().unwrap_or("");
+                    return !SKIP_DIRS.contains(&name);
+                }
+                true
+            })
+        {
+            // Check stop flag — break out cleanly so channels close properly
+            if stop_flag.load(Ordering::Relaxed) {
+                break 'scan;
+            }
+
             let entry = match entry_res {
                 Ok(e) => e,
                 Err(_) => continue,
@@ -136,6 +170,16 @@ async fn internal_behavior<A: SteadyActor>(
             };
 
             let is_file = md.is_file();
+
+            // Resume: skip files until we reach (and pass) the last processed path
+            if skipping && is_file {
+                let path_str = abs_path.to_string_lossy().to_string();
+                if path_str == resume_path {
+                    skipping = false; // found our position; next file will be processed
+                }
+                continue;
+            }
+
             let size = md.len();
             let modified = FileTime::from_last_modification_time(&md).seconds();
             let created = match FileTime::from_creation_time(&md) {
@@ -176,6 +220,10 @@ async fn internal_behavior<A: SteadyActor>(
             // Send path to AI model — only for duplicates
             if is_file && size > 0 && !hash.is_empty() {
                 let dup_path = abs_path.to_string_lossy().to_string();
+
+                // Track resume position after successfully processing this file
+                *resume_from.lock().unwrap() = dup_path.clone();
+
                 if let Some(orig_path) = seen_hashes.get(&hash) {
                     let msg = format!("{}|{}", dup_path, orig_path);
                     actor.wait_vacant(&mut crawler_to_ai_model_tx, 1).await;
@@ -201,7 +249,6 @@ async fn internal_behavior<A: SteadyActor>(
 
 
 // Read first 1024 bytes of file then hash, note that this hashes the bytes, not a string from the file
-// TODO: double check that hashing bytes is correct
 pub fn get_file_hash(file_name: PathBuf) -> Result<String, Box<dyn Error>> {
 
     let mut file = std::fs::File::open(file_name)?;
@@ -222,81 +269,4 @@ pub fn get_file_hash(file_name: PathBuf) -> Result<String, Box<dyn Error>> {
     let convert = hex::encode(out);
     
     Ok(convert)
-}
-
-
-// function to visit test directory and return metadata of each file and insert into metadata struct
-// also updates state per every entry
-pub fn visit_dir(dir: &Path,
-                 state: &StateGuard<'_, CrawlerState> ) -> Result<Vec<FileMeta>, Box<dyn Error>> {
-
-    let mut metas: Vec<FileMeta> = Vec::new();
-
-    // Read the directory (non-recursive)
-    for entry_res in WalkDir::new(dir) {
-        let entry = match entry_res {
-            Ok(e) => e,
-            Err(_) => continue,
-        };
-        let rel_path: &Path = entry.path();
-	let abs_path: PathBuf = match std::path::absolute(&rel_path) {
-	    Ok(p) => p,
-	    Err(_) => continue,
-	};
-
-	// convert relative path to Pathbuf for printing
-	let rel_path: PathBuf = rel_path.to_path_buf();
-
-	let name_os: &OsStr = entry.file_name();
-
-	let file_name: String = match name_os.to_str() {
-            Some(s) => s.to_owned(),
-            None => name_os.to_string_lossy().into_owned(),
-        };
-
-	
-        // Try to get metadata; if failing for a specific entry, skip it but continue
-        match entry.metadata() {
-            Ok(md) => {
-                let is_file:  bool   = md.is_file();
-                let size:     u64    = md.len();
-                let modified: i64    = FileTime::from_last_modification_time(&md).seconds();
-                let created: i64 = match FileTime::from_creation_time(&md) {
-                    Some(t) => t.seconds(),
-                    None => 0,
-                };
-                let readonly: bool   = md.permissions().readonly();
-		let mut hash: String = String::new();
-
-		if is_file {
-            match get_file_hash(abs_path.clone()) {
-                Ok(h) => {
-                    hash = h;
-                }
-                Err(e) => {
-                    //eprintln!("Skipping locked/unreadable file {:?}: {}", abs_path, e);
-                    continue; // skip this entry and move on
-                }
-            }
-        }
-
-        metas.push(FileMeta {
-		        rel_path,
-		        abs_path,
-                file_name,
-		        hash, 
-                is_file,
-                size,
-                modified, 
-                created,
-                readonly,
-            });
-        }
-        Err(e) => {
-		// TODO: log errors here
-                //eprintln!("warning: cannot stat {}: {}", file_name, e);
-            }
-        }
-    }
-    Ok(metas)
 }
