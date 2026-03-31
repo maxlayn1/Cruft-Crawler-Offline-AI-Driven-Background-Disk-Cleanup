@@ -3,6 +3,7 @@ unused_imports = "allow"
 
 [package]
 name = "cruft-crawler"
+version = "0.1.0"
 edition = "2024"
 
 [dependencies]
@@ -15,3 +16,18 @@ hex = "0.4.3"
 serde = "1.0.228"
 serde_cbor = "0.11.2"
 toml = "0.9.11"
+anyhow = "1.0.100"
+llama-cpp-2 = "0.1.124"
+encoding_rs = "0.8.35"
+libc = "0.2"
+clap = "4.5.60"
+tokio = { version = "1", features = ["rt", "rt-multi-thread"] }
+ratatui = "0.30.0"
+crossterm = "0.29.0"
+
+tauri = { version = "2", features = [] }
+tauri-plugin-dialog = "2"
+serde_json = "1"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }

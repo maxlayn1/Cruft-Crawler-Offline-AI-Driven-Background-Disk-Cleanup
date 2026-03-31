@@ -1,0 +1,23 @@
+{
+  "productName": "CruftCrawler",
+  "version": "0.1.0",
+  "identifier": "com.cruftcrawler.app",
+  "build": {
+    "frontendDist": "./frontend"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "CruftCrawler — AI Disk Cleanup",
+        "width": 1000,
+        "height": 700,
+        "resizable": true,
+        "fullscreen": false
+      }
+    ],
+    "security": {
+      "csp": null
+    },
+    "withGlobalTauri": true
+  }
+}
