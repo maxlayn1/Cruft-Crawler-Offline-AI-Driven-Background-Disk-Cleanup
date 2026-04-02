@@ -51,10 +51,16 @@ async fn internal_behavior<A: SteadyActor>(
 
     while actor.is_running(|| ai_model_to_ui_rx.is_closed_and_empty()) {
         // Forward AI verdicts to the TUI thread
-        while let Some(verdict) = actor.try_take(&mut ai_model_to_ui_rx) {
-            // TODO: replace with real FileMeta path once channel type is updated
-            if verdict.trim().to_lowercase() == "delete" {
-                let _ = suggest_tx.send(PathBuf::from(&verdict));
+        while let Some(message) = actor.try_take(&mut ai_model_to_ui_rx) {
+            //eprintln!("UI received message: {:?}", message);  // ← add this
+            if let Some((verdict, path_str)) = message.split_once('|') {
+               // eprintln!("Verdict: {:?}, Path: {:?}", verdict, path_str);  // ← add this
+                if verdict.trim() == "delete" {
+                    //eprintln!("Sending to TUI: {:?}", path_str);  // ← add this
+                    let _ = suggest_tx.send(PathBuf::from(path_str.trim()));
+                }
+            } else {
+                eprintln!("Message did not split on '|': {:?}", message);  // ← add this
             }
         }
 
@@ -64,7 +70,7 @@ async fn internal_behavior<A: SteadyActor>(
             actor.try_send(&mut ui_to_db_tx, path);
         }
 
-        actor.wait_avail(&mut ai_model_to_ui_rx, 1).await;
+        actor.wait_avail(&mut ai_model_to_ui_rx, 1).await; 
     }
 
     Ok(())
