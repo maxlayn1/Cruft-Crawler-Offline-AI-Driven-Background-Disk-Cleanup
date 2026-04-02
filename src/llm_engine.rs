@@ -7,10 +7,10 @@ use llama_cpp_2::model::LlamaModel;
 use llama_cpp_2::model::params::LlamaModelParams;
 use llama_cpp_2::model::{AddBos, Special};
 use llama_cpp_2::sampling::LlamaSampler;
-use llama_cpp_2::{send_logs_to_tracing,LogOptions};
 use std::io::Write;
 use std::num::NonZeroU32;
 use std::{any, fs};
+use llama_cpp_2::{send_logs_to_tracing,LogOptions};
 
 use std::thread::sleep;
 use std::time::Duration;
@@ -24,7 +24,7 @@ impl LlmEngine {
     pub fn load_new_model(model_path: &str) -> anyhow::Result<Self> {
         let backend = LlamaBackend::init()?;
         let model_params = LlamaModelParams::default();
-        let log_options = LogOptions::default().with_logs_enabled(false);
+        let log_options = LogOptions::default().with_logs_enabled(true);
         send_logs_to_tracing(log_options);
 
         let model = LlamaModel::load_from_file(&backend, model_path, &model_params)?;
@@ -40,10 +40,109 @@ impl LlmEngine {
 
         Ok(Self { backend, model })
     }
+    // pub fn load_new_model(model_path: &str) -> anyhow::Result<Self> {
+    //     // #region agent log
+    //     let ts = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_millis() as u64;
+    //     let _ = std::fs::OpenOptions::new().append(true).create(true).open("debug-770348.log").and_then(|mut f| {
+    //         use std::io::Write;
+    //         let path_debug = format!("{:?}", std::path::Path::new(model_path));
+    //         let line = format!(r#"{{"sessionId":"770348","location":"llm_engine.rs:load_new_model:entry","message":"load_new_model called","data":{{"model_path":"{}","path_debug":"{}"}},"timestamp":{},"hypothesisId":"H1"}}"#, model_path.replace('\\', "\\\\").replace('"', "\\\""), path_debug.replace('\\', "\\\\").replace('"', "\\\""), ts);
+    //         writeln!(f, "{}", line)
+    //     });
+    //     // #endregion
 
+    //     // Resolve to absolute path so loading works regardless of process cwd (e.g. when run from IDE).
+    //     let path = std::path::Path::new(model_path);
+    //     let path = if path.is_relative() {
+    //         std::env::current_dir()?.join(path)
+    //     } else {
+    //         path.to_path_buf()
+    //     };
+    //     if !path.exists() {
+    //         anyhow::bail!("Model file not found: {} (resolved to {:?})", model_path, path);
+    //     }
+
+    //     // Canonicalize so the C API gets a single absolute path with no ./ or .. (avoids "failed to read magic" on Windows).
+    //     //let path = std::fs::canonicalize(&path)?;
+
+    //     // #region agent log
+    //     let ts2 = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_millis() as u64;
+    //     let path_str = path.to_string_lossy();
+    //     let _ = std::fs::OpenOptions::new().append(true).create(true).open("debug-770348.log").and_then(|mut f| {
+    //         use std::io::Write;
+    //         let line = format!(r#"{{"sessionId":"770348","location":"llm_engine.rs:load_new_model:before_init","message":"path resolved, before backend init","data":{{"resolved_path":"{}"}},"timestamp":{},"hypothesisId":"H2"}}"#, path_str.replace('\\', "\\\\").replace('"', "\\\""), ts2);
+    //         writeln!(f, "{}", line)
+    //     });
+    //     // #endregion
+
+    //     let backend = match LlamaBackend::init() {
+    //         Ok(b) => {
+    //             // #region agent log
+    //             let ts3 = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_millis() as u64;
+    //             let _ = std::fs::OpenOptions::new().append(true).create(true).open("debug-770348.log").and_then(|mut f| {
+    //                 use std::io::Write;
+    //                 let line = format!(r#"{{"sessionId":"770348","location":"llm_engine.rs:load_new_model:after_init","message":"LlamaBackend::init() succeeded","data":{{}},"timestamp":{},"hypothesisId":"H1"}}"#, ts3);
+    //                 writeln!(f, "{}", line)
+    //             });
+    //             // #endregion
+    //             b
+    //         }
+    //         Err(e) => {
+    //             // #region agent log
+    //             let ts3 = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_millis() as u64;
+    //             let err_str = format!("{:?}", e).replace('\\', "\\\\").replace('"', "\\\"");
+    //             let _ = std::fs::OpenOptions::new().append(true).create(true).open("debug-770348.log").and_then(|mut f| {
+    //                 use std::io::Write;
+    //                 let line = format!(r#"{{"sessionId":"770348","location":"llm_engine.rs:load_new_model:init_failed","message":"LlamaBackend::init() failed","data":{{"error":"{}"}},"timestamp":{},"hypothesisId":"H1"}}"#, err_str, ts3);
+    //                 writeln!(f, "{}", line)
+    //             });
+    //             // #endregion
+    //             return Err(e.into());
+    //         }
+    //     };
+
+    //     let model_params = LlamaModelParams::default();
+
+    //     // #region agent log
+    //     let ts4 = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_millis() as u64;
+    //     let _ = std::fs::OpenOptions::new().append(true).create(true).open("debug-770348.log").and_then(|mut f| {
+    //         use std::io::Write;
+    //         let line = format!(r#"{{"sessionId":"770348","location":"llm_engine.rs:load_new_model:before_load","message":"calling load_from_file","data":{{"path":"{}"}},"timestamp":{},"hypothesisId":"H2"}}"#, path_str.replace('\\', "\\\\").replace('"', "\\\""), ts4);
+    //         writeln!(f, "{}", line)
+    //     });
+    //     // #endregion
+
+    //     let model = match LlamaModel::load_from_file(&backend, &path_for_llama, &model_params) {
+    //         Ok(m) => {
+    //             // #region agent log
+    //             let ts5 = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_millis() as u64;
+    //             let _ = std::fs::OpenOptions::new().append(true).create(true).open("debug-770348.log").and_then(|mut f| {
+    //                 use std::io::Write;
+    //                 let line = format!(r#"{{"sessionId":"770348","location":"llm_engine.rs:load_new_model:after_load","message":"load_from_file succeeded","data":{{}},"timestamp":{},"hypothesisId":"H1"}}"#, ts5);
+    //                 writeln!(f, "{}", line)
+    //             });
+    //             // #endregion
+    //             m
+    //         }
+    //         Err(e) => {
+    //             // #region agent log
+    //             let ts5 = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_millis() as u64;
+    //             let err_str = format!("{:?}", e).replace('\\', "\\\\").replace('"', "\\\"");
+    //             let _ = std::fs::OpenOptions::new().append(true).create(true).open("debug-770348.log").and_then(|mut f| {
+    //                 use std::io::Write;
+    //                 let line = format!(r#"{{"sessionId":"770348","location":"llm_engine.rs:load_new_model:load_failed","message":"load_from_file failed","data":{{"error":"{}"}},"timestamp":{},"hypothesisId":"H2"}}"#, err_str, ts5);
+    //                 writeln!(f, "{}", line)
+    //             });
+    //             // #endregion
+    //             return Err(e.into());
+    //         }
+    //     };
+
+    //     Ok(Self { backend, model })
+    // }
     fn create_context(&self) -> anyhow::Result<LlamaContext<'_>> {
         let ctx_params = LlamaContextParams::default()
-            .with_n_ctx(Some(NonZeroU32::new(256).unwrap())) //IT CANNOT HANDLE 128 CONTEXT SIZE
+            .with_n_ctx(Some(NonZeroU32::new(2048).unwrap())) //IT CANNOT HANDLE 128 CONTEXT SIZE
             .with_n_threads(1)
             .with_n_threads_batch(1); //attempt to keep it to one thread
 
@@ -70,10 +169,11 @@ impl LlmEngine {
 
         // --- tunable knobs ---
         let chunk_size: usize = 1;
-        let chunk_delay = Duration::from_millis(50);
-        let gen_delay = Duration::from_millis(100);
+        let chunk_delay = Duration::from_millis(5);
+        let gen_delay = Duration::from_millis(1);
         let max_tokens = 20;
         // ----------------------
+        
 
         let mut batch = LlamaBatch::new(64, 1);
         let total = tokens.len();
