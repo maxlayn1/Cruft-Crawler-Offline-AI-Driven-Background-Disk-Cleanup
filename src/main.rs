@@ -14,8 +14,10 @@ pub(crate) mod llm_engine;
 // TODO: Add functionality for priority setting using screensaver api
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
+     
 
-    init_logging(LogLevel::Info)?;
+
+    init_logging(LogLevel::Info, None)?;
 
     // pass unit value into .build() to ignore cli_args for now
     let mut graph = GraphBuilder::default().build(());
