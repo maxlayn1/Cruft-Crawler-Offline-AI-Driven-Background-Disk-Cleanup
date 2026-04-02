@@ -38,9 +38,10 @@ async fn internal_behavior<A: SteadyActor>(mut actor: A,
         
         // Handle any confirmed user deletions from UI
         if let Some(path) = actor.try_take(&mut ui_to_db_rx) {
-            println!("User confirmed deletion: {:?}", path);
+           // println!("User confirmed deletion: {:?}", path);
             match fs::remove_file(&path) {
-                Ok(_) => println!("Deleted from disk: {:?}", path),
+                Ok(_) => (),
+                //Ok(_) => println!("Deleted from disk: {:?}", path),
                 Err(e) => eprintln!("Failed to delete {:?}: {}", path, e),
             }
             // TODO: remove corresponding sled entry by looking up key for this path
