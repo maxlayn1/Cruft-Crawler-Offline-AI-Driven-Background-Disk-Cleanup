@@ -1,0 +1,1026 @@
+*   commit 00d3f499a584f4cad20e9d031a805196c27b0e12 (refs/stash)
+|\  Merge: ea98bf0 9c37680
+| | Author: zaigiaz <shayne.tman@gmail.com>
+| | Date:   Wed Apr 1 23:38:41 2026 -0500
+| | 
+| |     On cruftcrawler_0.1: ea98bf0 update toml file
+| | 
+| * commit 9c37680ab4a39ad168e4e065aa5878e0ca76b1d1
+|/  Author: zaigiaz <shayne.tman@gmail.com>
+|   Date:   Wed Apr 1 23:38:41 2026 -0500
+|   
+|       index on cruftcrawler_0.1: ea98bf0 update toml file
+|   
+|    Cargo.toml | 6 +-----
+|    1 file changed, 1 insertion(+), 5 deletions(-)
+|   
+| * commit 1a4c76e58e1581358e9bdf30dfc4cfbd78bf0d4b (HEAD -> main, origin/main, origin/cruftcrawler_0.1, origin/HEAD, cruftcrawler_0.1)
+| | Author: jace ackerman <jaceackerman7@gmail.com>
+| | Date:   Wed Apr 1 21:10:11 2026 -0500
+| | 
+| |     updated main.rs
+| | 
+| |  src/main.rs | 4 +++-
+| |  1 file changed, 3 insertions(+), 1 deletion(-)
+| | 
+| * commit 0ef5a159bcb607d13ad003033b7fd14016abb7d2
+| | Author: jace ackerman <jaceackerman7@gmail.com>
+| | Date:   Wed Apr 1 21:09:53 2026 -0500
+| | 
+| |     llm_engine no longer produces log output to stdout, changed turnable knobs for testing.
+| | 
+| |  src/llm_engine.rs | 110 +++++++++++++++++++++++++++++++++++++++++++++++---
+| |  1 file changed, 105 insertions(+), 5 deletions(-)
+| | 
+| * commit 070b8e8597e355cfba4cd55246db276bdc8758e4
+| | Author: jace ackerman <jaceackerman7@gmail.com>
+| | Date:   Wed Apr 1 21:07:23 2026 -0500
+| | 
+| |     Updated TUI. Fixed output messing with TUI text positions.
+| | 
+| |  src/actor/user_interface.rs | 16 +++++++++++-----
+| |  1 file changed, 11 insertions(+), 5 deletions(-)
+| | 
+| * commit f461beda93f763221b207866430e1809d9a1f41a
+| | Author: jace ackerman <jaceackerman7@gmail.com>
+| | Date:   Wed Apr 1 21:06:25 2026 -0500
+| | 
+| |     Not fully finished.There are no channel errors. Needs features implemented.
+| | 
+| |  src/actor/db_manager.rs | 5 +++--
+| |  1 file changed, 3 insertions(+), 2 deletions(-)
+| | 
+| * commit 22e5b9f44570e43b11ff276d71fc1fbb335f3b48
+| | Author: jace ackerman <jaceackerman7@gmail.com>
+| | Date:   Wed Apr 1 21:03:34 2026 -0500
+| | 
+| |     AI_Actor now is fed real file data and sends verdict to ui
+| | 
+| |  src/actor/ai_model.rs | 151 +++++++++++++++++++++++++++++-----------------
+| |  1 file changed, 96 insertions(+), 55 deletions(-)
+| | 
+| * commit 08fb93ae227b32e849c878abf55a866b680f9058
+|/  Author: jace ackerman <jaceackerman7@gmail.com>
+|   Date:   Wed Apr 1 21:03:01 2026 -0500
+|   
+|       Crawler sends one file at a time to DB and AI actors, fixed channel errors
+|   
+|    src/actor/crawler.rs | 264 +++++++++++++++++++++++------------------------
+|    1 file changed, 129 insertions(+), 135 deletions(-)
+| 
+* commit ea98bf04dab72483c58f85dd7a1d624fb3ced975
+| Author: jace ackerman <jaceackerman7@gmail.com>
+| Date:   Mon Mar 2 23:18:18 2026 -0600
+| 
+|     update toml file
+| 
+|  Cargo.toml | 6 +++++-
+|  1 file changed, 5 insertions(+), 1 deletion(-)
+| 
+* commit 5c0bfa05d4ec37ac411f1d707e0c16c044191fe4
+| Author: jace ackerman <jaceackerman7@gmail.com>
+| Date:   Mon Mar 2 23:17:17 2026 -0600
+| 
+|     TUI integrated into code
+| 
+|  src/actor/ai_model.rs       |  16 ++-
+|  src/actor/crawler.rs        |  30 +++--
+|  src/actor/db_manager.rs     |  28 +++--
+|  src/actor/user_interface.rs | 276 ++++++++++++++++++++++++++++++++++++------
+|  src/main.rs                 |  92 +++++++-------
+|  5 files changed, 332 insertions(+), 110 deletions(-)
+|   
+*   commit 5fff8dbb3e7c0040d3719854b5a2cdfd87043e8a
+|\  Merge: af4e31f a822681
+| | Author: jace ackerman <jaceackerman7@gmail.com>
+| | Date:   Wed Feb 25 21:37:52 2026 -0600
+| | 
+| |     fixed channels between crawler and db_manager. Also merged optimizer code with working actors.
+| | 
+| * commit a82268182b49cdc81cfc0c9c3c784363d412bc0b
+| | Author: maxlayn1 <maxlayn1@gmail.com>
+| | Date:   Tue Feb 24 14:05:24 2026 -0600
+| | 
+| |     added LLM_responses.txt to gitignore since no need to push it
+| | 
+| |  .gitignore | 4 +++-
+| |  1 file changed, 3 insertions(+), 1 deletion(-)
+| | 
+| * commit 8f07160a4cc57ee216024ec40d448b5c0bdf71ca
+| | Author: maxlayn1 <maxlayn1@gmail.com>
+| | Date:   Tue Feb 24 13:56:38 2026 -0600
+| | 
+| |     removed LLM_responses.txt
+| | 
+| |  LLM_responses.txt | 1 -
+| |  1 file changed, 1 deletion(-)
+| | 
+| * commit 0d6eb167e17c3879ef6a681851f2b8b00c15cd27
+| | Author: maxlayn1 <maxlayn1@gmail.com>
+| | Date:   Tue Feb 24 02:45:22 2026 -0600
+| | 
+| |     seems to successfully sleep and feed tokens slowly? i am going to bed this is awful
+| | 
+| |  LLM_responses.txt |   1 +
+| |  src/llm_engine.rs | 131 ++++++++++++++++++++++++++++++++------------------
+| |  2 files changed, 85 insertions(+), 47 deletions(-)
+| | 
+| * commit 0215bef3d523878a528201636aa2e37ed9f3ea42
+| | Author: maxlayn1 <maxlayn1@gmail.com>
+| | Date:   Tue Feb 24 01:55:39 2026 -0600
+| | 
+| |     it cant handle 128 context size, but but limiting to one thread in params seems to work
+| | 
+| |  src/llm_engine.rs | 4 +++-
+| |  1 file changed, 3 insertions(+), 1 deletion(-)
+| | 
+| * commit 67b331414728045a5e8134b07749130c074b4935
+| | Author: maxlayn1 <maxlayn1@gmail.com>
+| | Date:   Mon Feb 23 22:01:28 2026 -0600
+| | 
+| |     successfully pins the process to core 0, but seems to overfill to cores 1 and 2
+| | 
+| |  LLM_responses.txt |  1 -
+| |  src/llm_engine.rs | 12 ++++++++++++
+| |  2 files changed, 12 insertions(+), 1 deletion(-)
+| | 
+| * commit 24d336718511643771a439a40b3ad2782ac797d7
+| | Author: maxlayn1 <maxlayn1@gmail.com>
+| | Date:   Mon Feb 23 21:39:16 2026 -0600
+| | 
+| |     reduced context size to 256
+| | 
+| |  LLM_responses.txt            |   1 +
+| |  src/db/db                    | Bin 524288 -> 524288 bytes
+| |  src/db/snap.000000000000012B | Bin 0 -> 80 bytes
+| |  src/llm_engine.rs            |  97 +++++++++++----------------------------
+| |  4 files changed, 28 insertions(+), 70 deletions(-)
+| | 
+| * commit 3fb8c21af98f62661a070848aca2dcf348ca4446
+| | Author: maxlayn1 <maxlayn1@gmail.com>
+| | Date:   Thu Feb 12 15:12:54 2026 -0600
+| | 
+| |     more progress on fixing my mess ig
+| | 
+| |  src/llm_engine.rs | 75 ++++++++++++++++++++++++++++-----------------------
+| |  1 file changed, 41 insertions(+), 34 deletions(-)
+| | 
+| * commit a357b74b44e4bcfe1aec96fc7fe9aab544734bdd
+| | Author: maxlayn1 <maxlayn1@gmail.com>
+| | Date:   Thu Feb 12 14:51:19 2026 -0600
+| | 
+| |     begun working on throttling config struct
+| | 
+| |  src/llm_engine.rs | 29 ++++++++++++++++++++++++++++-
+| |  1 file changed, 28 insertions(+), 1 deletion(-)
+| | 
+| * commit 27b334c754473e3f7b39c5d691188c387c7c56f0
+| | Author: maxlayn1 <maxlayn1@gmail.com>
+| | Date:   Thu Feb 12 14:34:47 2026 -0600
+| | 
+| |     swapped to most minimal possible sampler
+| | 
+| |  src/llm_engine.rs | 6 +-----
+| |  1 file changed, 1 insertion(+), 5 deletions(-)
+| | 
+| * commit e4a565f311f0f60f121b8ccb3f03e0dae8806016
+| | Author: maxlayn1 <maxlayn1@gmail.com>
+| | Date:   Thu Feb 12 14:24:27 2026 -0600
+| | 
+| |     added comments and variables to begin chunking
+| | 
+| |  src/db/db         | Bin 2621439 -> 524288 bytes
+| |  src/llm_engine.rs |  30 ++++++++++++++++--------------
+| |  2 files changed, 16 insertions(+), 14 deletions(-)
+| | 
+| * commit 0acc8122f9e3e953bc4b8966ac80fcbc99cd8aad
+| | Author: maxlayn1 <maxlayn1@gmail.com>
+| | Date:   Tue Feb 10 15:06:17 2026 -0600
+| | 
+| |     added libraries needed to sleep the process, and put initial tunable performance variables
+| | 
+| |  src/llm_engine.rs | 9 +++++++++
+| |  1 file changed, 9 insertions(+)
+| | 
+| * commit 4a020d7a65da872ec81297c82ac49b1fdea8c30c
+| | Author: maxlayn1 <maxlayn1@gmail.com>
+| | Date:   Tue Feb 10 15:04:02 2026 -0600
+| | 
+| |     reduced batch size to 64
+| | 
+| |  src/llm_engine.rs | 2 +-
+| |  1 file changed, 1 insertion(+), 1 deletion(-)
+| | 
+| * commit eeafea1caf146bc1b278f1ea3c2f2f80069e0fbf
+| | Author: maxlayn1 <maxlayn1@gmail.com>
+| | Date:   Tue Feb 10 15:02:23 2026 -0600
+| | 
+| |     set model to use a single core
+| | 
+| |  src/llm_engine.rs | 4 +++-
+| |  1 file changed, 3 insertions(+), 1 deletion(-)
+| | 
+| * commit c20b7a3783917275d434590cd6a9d43e002426a2
+| | Author: maxlayn1 <maxlayn1@gmail.com>
+| | Date:   Tue Feb 10 14:59:45 2026 -0600
+| | 
+| |     reduced moddle context size from 2056 to 128, can up to 256 if needed
+| | 
+| |  src/llm_engine.rs | 2 +-
+| |  1 file changed, 1 insertion(+), 1 deletion(-)
+| | 
+| * commit 64c03ead8ed1186ff6469fb74f8584f2d35d1e28
+| | Author: maxlayn1 <maxlayn1@gmail.com>
+| | Date:   Tue Feb 10 14:54:39 2026 -0600
+| | 
+| |     fixed gitignore path
+| | 
+| |  .gitignore            | 2 +-
+| |  src/actor/ai_model.rs | 2 +-
+| |  2 files changed, 2 insertions(+), 2 deletions(-)
+| | 
+| * commit bca515f4e5134a50e0894dd656c12d71625fc5c4
+| | Author: maxlayn1 <maxlayn1@gmail.com>
+| | Date:   Tue Feb 10 14:42:04 2026 -0600
+| | 
+| |     added models folder to gitignore
+| | 
+| |  .gitignore | 4 ++++
+| |  1 file changed, 4 insertions(+)
+| | 
+| * commit 527175787d39ebb64cc0890c5c194925a0b60477
+| | Author: maxlayn1 <maxlayn1@gmail.com>
+| | Date:   Tue Feb 10 14:40:15 2026 -0600
+| | 
+| |     fixed typo
+| | 
+| |  Cargo.toml | 2 +-
+| |  1 file changed, 1 insertion(+), 1 deletion(-)
+| | 
+| * commit 0d62821b876f870966eee1acbe601c5c4d457fc3
+| | Author: maxlayn1 <maxlayn1@gmail.com>
+| | Date:   Tue Feb 10 14:38:47 2026 -0600
+| | 
+| |     added cargo dependencies to optimize LLM and run it
+| | 
+| |  Cargo.lock | 184 +++++++++++++++++++++++++++++++++++++++++++++++++++++++--
+| |  Cargo.toml |   4 ++
+| |  2 files changed, 184 insertions(+), 4 deletions(-)
+| | 
+* | commit af4e31ffcbcdc81d825fc72253fb83937f21e0a0
+|/  Author: jace ackerman <jaceackerman7@gmail.com>
+|   Date:   Sat Feb 21 00:11:38 2026 -0600
+|   
+|       Now handles errors for all try_send() and try_take() functions. Fixed actors panicking.
+|   
+|    Cargo.toml                  |  3 +++
+|    src/actor/ai_model.rs       | 15 +++++++--------
+|    src/actor/crawler.rs        | 35 ++++++++++++++++++++++++++++-------
+|    src/actor/db_manager.rs     | 17 +++++++----------
+|    src/actor/file_handler.rs   |  6 +++---
+|    src/actor/user_interface.rs | 22 ++++++++++++++--------
+|    src/llm_engine.rs           |  3 +--
+|    7 files changed, 63 insertions(+), 38 deletions(-)
+| 
+* commit e2b64462b68ed4c9f660d34fd874acfc7d26b858
+| Author: jace ackerman <jaceackerman7@gmail.com>
+| Date:   Fri Jan 30 22:33:53 2026 -0600
+| 
+|     added prompt file
+| 
+|  src/prompt.txt | 10 ++++++++++
+|  1 file changed, 10 insertions(+)
+| 
+* commit f05d4ff0b710027d62946fcf432034b8bf26d847
+| Author: jace ackerman <jaceackerman7@gmail.com>
+| Date:   Fri Jan 30 22:32:51 2026 -0600
+| 
+|     updated main
+| 
+|  src/main.rs | 12 ++++++++----
+|  1 file changed, 8 insertions(+), 4 deletions(-)
+| 
+* commit 67e93f53325e4dbfdd1b2421da890a3d0af25c52
+| Author: jace ackerman <jaceackerman7@gmail.com>
+| Date:   Fri Jan 30 22:32:18 2026 -0600
+| 
+|     Updated ai_model. Now uses llm_engine
+| 
+|  src/actor/ai_model.rs | 32 ++++++++++++++++++++++++++++++--
+|  1 file changed, 30 insertions(+), 2 deletions(-)
+| 
+* commit 43eea093cceabfdaad3a35f89a6d57ce1024144a
+| Author: jace ackerman <jaceackerman7@gmail.com>
+| Date:   Fri Jan 30 22:31:16 2026 -0600
+| 
+|     Added llm_engine. This interfaces with llama-cpp-2.
+| 
+|  src/llm_engine.rs | 109 ++++++++++++++++++++++++++++++++++++++++++++++++++++
+|  1 file changed, 109 insertions(+)
+| 
+* commit 256b2cb697e924b9d5785fcae6206236824bda8d
+| Author: jace ackerman <jaceackerman7@gmail.com>
+| Date:   Tue Jan 27 22:00:28 2026 -0600
+| 
+|     added database files
+| 
+|  src/db/db                    | Bin 2621439 -> 2621439 bytes
+|  src/db/snap.0000000000CBEADB | Bin 113 -> 0 bytes
+|  2 files changed, 0 insertions(+), 0 deletions(-)
+| 
+* commit 1e513c74c7f7e24a6cb0bb3521698c138267ef04
+| Author: jace ackerman <jaceackerman7@gmail.com>
+| Date:   Fri Jan 23 18:49:38 2026 -0600
+| 
+|     Add git-log.txt for repo submission
+| 
+|  git-log.txt | 0
+|  1 file changed, 0 insertions(+), 0 deletions(-)
+|   
+*   commit 9773c97a012be2b57a114e53c2dca9ad5920e8e8
+|\  Merge: 9e56892 4ec11d5
+| | Author: jace ackerman <jaceackerman7@gmail.com>
+| | Date:   Fri Jan 23 18:42:09 2026 -0600
+| | 
+| |     Steady state boiler code
+| | 
+| * commit 4ec11d59abedc18e237228605707f7b3ec62f4cb (origin/crawler_database_ai_actor_prototype)
+| | Author: jace ackerman <jaceackerman7@gmail.com>
+| | Date:   Fri Jan 23 18:28:16 2026 -0600
+| | 
+| |     Boiler Plate Code
+| | 
+| |  src/actor/ai_model.rs        |  31 +++++++++++++++-----------
+| |  src/actor/crawler.rs         |  26 +++++++++++++---------
+| |  src/actor/db_manager.rs      |  29 ++++++++++++++++--------
+| |  src/actor/file_handler.rs    |  47 +++++++++++++++++++++++++++++++++++++++
+| |  src/actor/user_interface.rs  |  46 ++++++++++++++++++++++++++++++++++++++
+| |  src/db/db                    | Bin 524287 -> 2621439 bytes
+| |  src/db/snap.000000000005E840 | Bin 163 -> 0 bytes
+| |  src/db/snap.0000000000CB8AAD | Bin 0 -> 84 bytes
+| |  src/main.rs                  |  32 +++++++++++++++++++++-----
+| |  9 files changed, 173 insertions(+), 38 deletions(-)
+| | 
+| * commit a5541a2888328dba6621ab8d41418962d2079cf2
+| | Author: jace ackerman <jaceackerman7@gmail.com>
+| | Date:   Thu Jan 22 21:59:58 2026 -0600
+| | 
+| |     First commit. AI actor's code needs fixed.
+| | 
+| |  src/actor/ai_model.rs        |  37 +++++++++++++++++++++++++++++++++++++
+| |  src/actor/crawler.rs         |  28 ++++++++++++++++------------
+| |  src/actor/db_manager.rs      |  10 +++++-----
+| |  src/db/conf                  |   4 ++++
+| |  src/db/db                    | Bin 0 -> 524287 bytes
+| |  src/db/snap.000000000005E840 | Bin 0 -> 163 bytes
+| |  src/main.rs                  |  10 +++++++++-
+| |  7 files changed, 71 insertions(+), 18 deletions(-)
+| |   
+* |   commit 9e5689262f5d1084739e8b443eb1c63ca72c86d1
+|\ \  Merge: b6d3cba 35d9e33
+| |/  Author: zaigiaz <155196761+zaigiaz@users.noreply.github.com>
+|/|   Date:   Tue Jan 20 14:06:05 2026 -0600
+| |   
+| |       Merge pull request #11 from zaigiaz/main
+| |       
+| |       add toml crate, added cargo.lock to gitignore
+| |   
+| *   commit 35d9e33a83f737bd05e2f5e239e405a53a4c9e11
+| |\  Merge: 20fef78 b6d3cba
+| |/  Author: zaigiaz <155196761+zaigiaz@users.noreply.github.com>
+|/|   Date:   Tue Jan 20 14:04:53 2026 -0600
+| |   
+| |       Merge branch 'maxlayn1:main' into main
+| |   
+* |   commit b6d3cbad60b2fa1ba131f989f3921fc5d0b1ccf7
+|\ \  Merge: 827975c 7babf31
+| | | Author: zaigiaz <155196761+zaigiaz@users.noreply.github.com>
+| | | Date:   Mon Jan 19 18:56:04 2026 -0600
+| | | 
+| | |     Merge pull request #10 from zaigiaz/main
+| | |     
+| | |     Added CrawlerState, Fixed Build, todos
+| | | 
+| | * commit 20fef7810fb3b3c14a2fdb2533fb34660ab3fe87
+| | | Author: zaigiaz <shayne.tman@gmail.com>
+| | | Date:   Tue Jan 20 13:52:42 2026 -0600
+| | | 
+| | |     second commit
+| | | 
+| | |  .gitignore              |  1 +
+| | |  Cargo.lock              | 73 ++++++++++++++++++++++++++++++++++++++++++-
+| | |  Cargo.toml              |  6 ++--
+| | |  src/actor/db_manager.rs | 15 ++++-----
+| | |  src/main.rs             |  2 ++
+| | |  5 files changed, 86 insertions(+), 11 deletions(-)
+| | | 
+| | * commit 15affb274c207205d8b59da10205c7d9719d8c1c
+| | | Author: zaigiaz <shayne.tman@gmail.com>
+| | | Date:   Tue Jan 20 13:34:57 2026 -0600
+| | | 
+| | |     added toml crate, removed Cargo.lock
+| | | 
+| | |  config.toml | 6 ++++--
+| | |  1 file changed, 4 insertions(+), 2 deletions(-)
+| | | 
+| | * commit f99357fb54a03e968815348f44c5c3bfccc59c7a
+| |/  Author: zaigiaz <shayne.tman@gmail.com>
+| |   Date:   Mon Jan 19 21:51:39 2026 -0600
+| |   
+| |       passed in state
+| |   
+| |    src/actor/crawler.rs | 11 ++++++-----
+| |    1 file changed, 6 insertions(+), 5 deletions(-)
+| |   
+| *   commit 7babf31f115bcc4bcf41ce680bfc8567111d4c51
+| |\  Merge: f3bd57e 827975c
+| |/  Author: zaigiaz <155196761+zaigiaz@users.noreply.github.com>
+|/|   Date:   Mon Jan 19 18:53:03 2026 -0600
+| |   
+| |       Merge branch 'maxlayn1:main' into main
+| |   
+* |   commit 827975c5add85a9ec5d449bd688f3d9050b04667
+|\ \  Merge: 3c62169 6964dba
+| | | Author: zaigiaz <155196761+zaigiaz@users.noreply.github.com>
+| | | Date:   Thu Jan 15 21:02:32 2026 -0600
+| | | 
+| | |     Merge pull request #9 from zaigiaz/main
+| | |     
+| | |     merge and fix broken repo fork
+| | | 
+| | * commit f3bd57e1f66b0bc06fa7536db806dd4e3831f7b3
+| | | Author: zaigiaz <shayne.tman@gmail.com>
+| | | Date:   Mon Jan 19 18:52:55 2026 -0600
+| | | 
+| | |     added TODOs, worked on state some more
+| | | 
+| | |  src/actor/crawler.rs | 24 ++++++++++++------------
+| | |  1 file changed, 12 insertions(+), 12 deletions(-)
+| | | 
+| | * commit fc2d091c867c125635b4eee333d77c2b83b66267
+| | | Author: zaigiaz <shayne.tman@gmail.com>
+| | | Date:   Mon Jan 19 14:51:38 2026 -0600
+| | | 
+| | |     Crawler Actor state, fixed build, renamed test_dir
+| | | 
+| | |  Cargo.lock                                      | 277 ++++++++++++++----
+| | |  Cargo.toml                                      |   3 +
+| | |  README.md                                       |  27 +-
+| | |  src/actor/crawler.rs                            |  39 ++-
+| | |  src/actor/db_manager.rs                         |   9 +-
+| | |  src/main.rs                                     |   6 +-
+| | |  .../another_file.md                             |   0
+| | |  src/{crawl_test => test_directory}/dupicate.txt |   0
+| | |  src/{crawl_test => test_directory}/first.txt    |   0
+| | |  src/{crawl_test => test_directory}/hello.cpp    |   0
+| | |  src/{crawl_test => test_directory}/second.txt   |   0
+| | |  .../third_file.txt                              |   0
+| | |  12 files changed, 278 insertions(+), 83 deletions(-)
+| | | 
+| | * commit 9088bb81747e3485ca4b28327359d314487ba786
+| |/  Author: zaigiaz <shayne.tman@gmail.com>
+| |   Date:   Thu Jan 15 19:00:24 2026 -0600
+| |   
+| |       added temp dir for repo submission
+| |   
+| |    git-logs/git-log.txt    | 170 ++++++++++++++++++++++++++++++++++++++++++
+| |    git-logs/jace-log.txt   | 162 ++++++++++++++++++++++++++++++++++++++++
+| |    git-logs/max-log.txt    |  32 ++++++++
+| |    git-logs/note.txt       |   7 ++
+| |    notes/git_submission.md |   2 +-
+| |    5 files changed, 372 insertions(+), 1 deletion(-)
+| | 
+| * commit 6964dba6c54d82be7113fd4a941e67d457addf4c
+|/  Author: zaigiaz <shayne.tman@gmail.com>
+|   Date:   Wed Jan 14 10:33:48 2026 -0600
+|   
+|       merge and fix broken repo fork
+|   
+|    Cargo.toml                            |  11 +-
+|    README.md                             |  62 ++-
+|    config.toml                           |  14 +
+|    notes/Project_Resources.md            |  15 -
+|    notes/SENIOR PROJ DESCRIPTION.pdf     | Bin 140850 -> 0 bytes
+|    notes/database.md                     |  42 ++
+|    notes/git_submission.md               |  15 +
+|    notes/llm_kv_schema.md                | 872 ------------------------------
+|    notes/meeting questions and notes.txt |  37 --
+|    notes/overview.md                     |  21 +
+|    notes/screensaver-api.md              |  17 +
+|    src/actor/crawler.rs                  | 183 +++++++
+|    src/actor/db_manager.rs               |  75 +++
+|    src/actor/profiler.rs                 |  28 -
+|    src/crawl_test/another_file.md        |   2 +
+|    src/crawl_test/dupicate.txt           |  70 +++
+|    src/crawl_test/first.txt              |  70 +++
+|    src/crawl_test/hello.cpp              |  13 +
+|    src/crawl_test/second.txt             |   4 +
+|    src/crawl_test/third_file.txt         |   4 +
+|    src/main.rs                           |  95 ++--
+|    21 files changed, 623 insertions(+), 1027 deletions(-)
+|   
+| * commit c898fcb22f9652fcc9a544de295990d08c3398db (origin/ui, ui)
+| | Author: Rohit Chandel <rohoxoxo@gmail.com>
+| | Date:   Tue Feb 17 13:35:40 2026 -0600
+| | 
+| |     New window for Reason Section
+| | 
+| |  src/ui.rs     |   1 +
+| |  ui/main.slint | 298 +++++++++++++++++++++++++++++++++++++++---------------
+| |  2 files changed, 219 insertions(+), 80 deletions(-)
+| | 
+| * commit f5f808011d6c442db65ff471439840a9b7ed56f6
+| | Author: Rohit Chandel <rohoxoxo@gmail.com>
+| | Date:   Mon Feb 16 13:57:12 2026 -0600
+| | 
+| |     Added Status Bar + Column of Reason and Size
+| | 
+| |  src/report.rs |  24 +++++++++-
+| |  src/ui.rs     | 140 +++++++++++++++++++++++++++++++++++++++++-------------
+| |  ui/main.slint |  65 ++++++++++++++++++++-----
+| |  3 files changed, 181 insertions(+), 48 deletions(-)
+| | 
+| * commit dcd3b052e321cb809fe2bc152e6516da864f88ea
+| | Author: Rohit Chandel <rohoxoxo@gmail.com>
+| | Date:   Wed Feb 11 12:31:56 2026 -0600
+| | 
+| |     UI: File picker + row count + decision coloring + row selection
+| |     
+| |     Changes:
+| |     - Replaced hardcoded TSV path with native file picker (rfd crate).
+| |     - Status bar now displays loaded row count.
+| |     - Decision column visually distinguishes KEEP (green) and DELETE (red).
+| |     - Implemented row selection with highlight support.
+| |     
+| |     This improves human-in-the-loop usability and prepares the UI for upcoming decision editing and persistence features.
+| | 
+| |  Cargo.lock          | 373 ++++++++++++++++++++++++++++++++++++++++++++----
+| |  Cargo.toml          |   3 +
+| |  data/llm_report.tsv |  10 ++
+| |  src/ui.rs           |  47 +++---
+| |  ui/main.slint       |  39 ++++-
+| |  5 files changed, 417 insertions(+), 55 deletions(-)
+| | 
+| * commit 89eb25bee50cb50e9cf80b4f5874fc135a133e63
+| | Author: Rohit Chandel <rohoxoxo@gmail.com>
+| | Date:   Wed Feb 11 11:30:13 2026 -0600
+| | 
+| |     UI-Skeleton
+| | 
+| |  Cargo.lock    | 22 +++++++++++++++++++
+| |  Cargo.toml    |  5 ++---
+| |  src/main.rs   | 10 ++++-----
+| |  src/report.rs | 26 +++++++++++++++++++++++
+| |  src/ui.rs     | 51 ++++++++++++++++++++++++++++++++++++++++++++
+| |  ui/main.slint | 63 ++++++++++++++++++++++++++++++++++++++++++++++++-------
+| |  6 files changed, 162 insertions(+), 15 deletions(-)
+| | 
+| * commit e58e04af0f01120169532667731f161746055dcb
+| | Author: Rohit Chandel <rohoxoxo@gmail.com>
+| | Date:   Tue Feb 10 14:53:56 2026 -0600
+| | 
+| |     UI: Slint skeleton + mock table
+| | 
+| |  Cargo.lock    | 6329 +++++++++++++++++++++++++++++++++++++++++++++++------
+| |  Cargo.toml    |   11 +-
+| |  build.rs      |    3 +
+| |  src/main.rs   |  572 ++---
+| |  ui/main.slint |   19 +
+| |  5 files changed, 6018 insertions(+), 916 deletions(-)
+| | 
+| * commit fc434ff96a73bc5a1d449ada6667e7330332cff0 (origin/LLM_Prompt)
+| | Author: Rohit Chandel <rohoxoxo@gmail.com>
+| | Date:   Mon Feb 9 20:47:48 2026 -0600
+| | 
+| |     Average CPU <5
+| |     
+| |     Still Sudden Spike
+| | 
+| |  Cargo.lock          |  92 +++++++++++++++++++++++++++++++----
+| |  Cargo.toml          |   1 +
+| |  data/llm_report.tsv |  20 --------
+| |  src/main.rs         | 126 ++++++++++++++++++++++++++++++++----------------
+| |  4 files changed, 169 insertions(+), 70 deletions(-)
+| | 
+| * commit 76b7130cbad6ef815c50837172ea032986bf2251
+| | Author: Rohit Chandel <rohoxoxo@gmail.com>
+| | Date:   Mon Feb 9 13:47:25 2026 -0600
+| | 
+| |     WIP: LLM prompt + report generation
+| | 
+| |  data/llm_report.tsv | 4 ++++
+| |  1 file changed, 4 insertions(+)
+| |   
+| | * commit 6694b49ece2d210626066efcc6f0ec5d2416494d (origin/CPU_optimized_LLM, CPU_optimized_LLM)
+| |/  Author: Rohit Chandel <rohoxoxo@gmail.com>
+| |   Date:   Mon Feb 9 13:57:03 2026 -0600
+| |   
+| |       Revert: Metadata Scanning (accidental push)
+| |   
+| |    Cargo.lock                     |   4 +-
+| |    Cargo.toml                     |   3 +-
+| |    data/demo_metadata_clean.jsonl |  20 ---
+| |    data/llm_report.tsv            |  17 ---
+| |    src/main.rs                    | 257 +++++++++++------------------------
+| |    5 files changed, 84 insertions(+), 217 deletions(-)
+| | 
+| * commit 634d255d1edb27d12aefac8304299c21273f0b2c
+| | Author: Rohit Chandel <rohoxoxo@gmail.com>
+| | Date:   Mon Feb 9 13:40:05 2026 -0600
+| | 
+| |     Metadata Scanning
+| | 
+| |  Cargo.lock                     |   4 +-
+| |  Cargo.toml                     |   3 +-
+| |  data/demo_metadata_clean.jsonl |  20 +++
+| |  data/llm_report.tsv            |  17 +++
+| |  src/main.rs                    | 257 +++++++++++++++++++++++++------------
+| |  5 files changed, 217 insertions(+), 84 deletions(-)
+| | 
+| * commit 589ca5e43ee77de2873ea9385d91fddff18eb8b0
+| | Author: maxlayn1 <maxlayn1@gmail.com>
+| | Date:   Thu Feb 5 14:55:32 2026 -0600
+| | 
+| |     ran rust formatter to clean it up
+| | 
+| |  src/main.rs | 33 ++++++++++++++++-----------------
+| |  1 file changed, 16 insertions(+), 17 deletions(-)
+| | 
+| * commit 22f776199f780f5dc529ba290dacec72201b96b1
+| | Author: maxlayn1 <maxlayn1@gmail.com>
+| | Date:   Thu Feb 5 14:54:05 2026 -0600
+| | 
+| |     context size is ACTUALLY 128 instead of 256 now
+| | 
+| |  src/main.rs | 6 +-----
+| |  1 file changed, 1 insertion(+), 5 deletions(-)
+| | 
+| * commit 02a26ddb2baf75e5baf04c27e4023a65932cb2fc
+| | Author: maxlayn1 <maxlayn1@gmail.com>
+| | Date:   Thu Feb 5 14:51:14 2026 -0600
+| | 
+| |     so far the best trade off seems to be 1.25s chunk delay, 30s gen delay, and chunk size of 1. it keeps the sudden spikes at a minimum, and instead hovers at like 20% single core usage for the entire process duration
+| | 
+| |  src/main.rs | 8 ++++----
+| |  1 file changed, 4 insertions(+), 4 deletions(-)
+| | 
+| * commit e0c02a4f353436f459d4764f98370fab80d80c9d
+| | Author: maxlayn1 <maxlayn1@gmail.com>
+| | Date:   Thu Feb 5 14:31:44 2026 -0600
+| | 
+| |     current theory is that keeping chunk size low reduces CPU spikes
+| | 
+| |  src/main.rs | 6 +++---
+| |  1 file changed, 3 insertions(+), 3 deletions(-)
+| | 
+| * commit 2a4747f4b19f9fa4d8405a3ea9713cf38bc20c0c
+| | Author: maxlayn1 <maxlayn1@gmail.com>
+| | Date:   Thu Feb 5 14:14:06 2026 -0600
+| | 
+| |     added generation delay timer to reduce CPU load
+| | 
+| |  src/main.rs | 5 +++++
+| |  1 file changed, 5 insertions(+)
+| | 
+| * commit 1140fbb5609e03a77db394416e5fcab22869f3f1
+| | Author: maxlayn1 <maxlayn1@gmail.com>
+| | Date:   Thu Feb 5 14:12:09 2026 -0600
+| | 
+| |     swapped to most minimal possible sampler for less CPU load
+| | 
+| |  src/main.rs | 15 ++++++---------
+| |  1 file changed, 6 insertions(+), 9 deletions(-)
+| | 
+| * commit f63a8b4e748f8d763ec9a9530742c840076f088f
+| | Author: maxlayn1 <maxlayn1@gmail.com>
+| | Date:   Thu Feb 5 14:09:12 2026 -0600
+| | 
+| |     reduced max token size from 100 to 20 for more performance
+| | 
+| |  src/main.rs | 7 +++----
+| |  1 file changed, 3 insertions(+), 4 deletions(-)
+| | 
+| * commit 363e97b46674f003d7edb72fa1d76285659f9a81
+| | Author: maxlayn1 <maxlayn1@gmail.com>
+| | Date:   Thu Feb 5 14:05:27 2026 -0600
+| | 
+| |     reduced the context size to 128 from 256 to further save on CPU performance, should be no issue.
+| | 
+| |  src/main.rs | 2 +-
+| |  1 file changed, 1 insertion(+), 1 deletion(-)
+| | 
+| * commit b1809e9004ff68e1a0e2ebb0964439d334e7666a
+| | Author: maxlayn1 <maxlayn1@gmail.com>
+| | Date:   Thu Feb 5 13:55:51 2026 -0600
+| | 
+| |     10 second sleep timer on feeding token input plus fully NICEd process seems good
+| | 
+| |  src/main.rs | 4 ++--
+| |  1 file changed, 2 insertions(+), 2 deletions(-)
+| | 
+| * commit b7d9bc2d837f89edcfbe82e06e08cea0bb8f1b0e
+| | Author: maxlayn1 <maxlayn1@gmail.com>
+| | Date:   Wed Feb 4 13:31:53 2026 -0600
+| | 
+| |     commented out the code to set the process to lowest NICE priority on OS, doesnt seem to do anything for performance, so ill leave it off for now
+| | 
+| |  src/main.rs | 7 ++++++-
+| |  1 file changed, 6 insertions(+), 1 deletion(-)
+| | 
+| * commit 59b47ff6bdb099f9340274bdbd0d7d5cebf72009
+| | Author: maxlayn1 <maxlayn1@gmail.com>
+| | Date:   Tue Feb 3 15:05:05 2026 -0600
+| | 
+| |     LLM successfully KEEPing passwd file when following Jace's prompt format. There is hope?
+| | 
+| |  src/main.rs | 7 +++----
+| |  1 file changed, 3 insertions(+), 4 deletions(-)
+| | 
+| * commit 0d4c933d3a4710755e59f54205b247bfedf2d333
+| | Author: maxlayn1 <maxlayn1@gmail.com>
+| | Date:   Tue Feb 3 14:54:02 2026 -0600
+| | 
+| |     swapped to q8 version of the model and it seems to be performing better than the q4 model in every way
+| | 
+| |  src/main.rs | 13 +++++++++++--
+| |  1 file changed, 11 insertions(+), 2 deletions(-)
+| | 
+| * commit da079550c137b196a623612ad3bd7193b12da99c
+| | Author: maxlayn1 <maxlayn1@gmail.com>
+| | Date:   Tue Feb 3 14:27:17 2026 -0600
+| | 
+| |     changed sleep timer between feeding tokens to 10 seconds, noticable performance increase
+| | 
+| |  src/main.rs | 2 +-
+| |  1 file changed, 1 insertion(+), 1 deletion(-)
+| | 
+| * commit 170532db6071c1ddefdc0953942a59802c634e67
+| | Author: maxlayn1 <maxlayn1@gmail.com>
+| | Date:   Tue Feb 3 14:26:31 2026 -0600
+| | 
+| |     added libc crate and code at beginning of main to pin the process to core 0
+| | 
+| |  Cargo.lock  |  1 +
+| |  Cargo.toml  |  1 +
+| |  src/main.rs | 15 +++++++++++++++
+| |  3 files changed, 17 insertions(+)
+| | 
+| * commit 4587f4ba0d5c5a349c73d854da4aa636324fc416
+| | Author: maxlayn1 <maxlayn1@gmail.com>
+| | Date:   Mon Feb 2 18:52:25 2026 -0600
+| | 
+| |     FINALLY tokenizing and slowing feeding tokens to LLM for better performance worksgit add .
+| | 
+| |  src/main.rs | 77 ++++++++++++++++++++++++++++++++++++++-------------------
+| |  1 file changed, 52 insertions(+), 25 deletions(-)
+| | 
+| * commit c6fb01e1abcdc0ddeea9884249094fb84ff7e56b
+| | Author: maxlayn1 <maxlayn1@gmail.com>
+| | Date:   Sun Feb 1 17:52:53 2026 -0600
+| | 
+| |     reduced batch size for more performance
+| | 
+| |  src/main.rs | 2 +-
+| |  1 file changed, 1 insertion(+), 1 deletion(-)
+| | 
+| * commit 6397ba4f201010f581944f69032a56e8d03db0d7
+| | Author: maxlayn1 <maxlayn1@gmail.com>
+| | Date:   Sun Feb 1 17:49:31 2026 -0600
+| | 
+| |     limited to using a single CPU core i think, but still spikes that core to 100% usage
+| | 
+| |  src/main.rs | 4 +++-
+| |  1 file changed, 3 insertions(+), 1 deletion(-)
+| | 
+| * commit 787dde83864ae4f7c59f6d96f9c04f6b7cb378d6
+| | Author: maxlayn1 <maxlayn1@gmail.com>
+| | Date:   Thu Jan 29 14:49:47 2026 -0600
+| | 
+| |     Reduced context size to 256 tokens
+| | 
+| |  src/main.rs | 4 ++--
+| |  1 file changed, 2 insertions(+), 2 deletions(-)
+| | 
+| * commit 6232d5534822a3d5647d869b4a857275fc21af3e
+| | Author: maxlayn1 <maxlayn1@gmail.com>
+| | Date:   Thu Jan 29 14:35:28 2026 -0600
+| | 
+| |     Changed prompt to a binary question similar to goal prompt of asking KEEP or DELETE.
+| | 
+| |  src/main.rs | 2 +-
+| |  1 file changed, 1 insertion(+), 1 deletion(-)
+| | 
+| * commit 3cc27ef63ff9baa7f3a10ecc68cb254dfd37cfe6
+| | Author: maxlayn1 <maxlayn1@gmail.com>
+| | Date:   Thu Jan 29 14:29:42 2026 -0600
+| | 
+| |     Got a prompt that gets the LLM to successfully output only a single word to test CPU usage. Although a shorter spike, still hit 107% CPU usage. (???)
+| | 
+| |  src/main.rs | 2 +-
+| |  1 file changed, 1 insertion(+), 1 deletion(-)
+| | 
+| * commit 7bf4142b510afd7c51730d8858f886aacc0909d7
+| | Author: maxlayn1 <maxlayn1@gmail.com>
+| | Date:   Thu Jan 29 14:14:37 2026 -0600
+| | 
+| |     created new branch to try to optimize LLM CPU usage on
+| | 
+| |  git-log.txt | 32 ++++++++++++++++++++++++++++++++
+| |  src/main.rs |  2 +-
+| |  2 files changed, 33 insertions(+), 1 deletion(-)
+| | 
+| * commit b4e873af3c40ce3bd710071794303073bd38e52b (origin/actor_with_LLM_prototype)
+| | Author: maxlayn1 <maxlayn1@gmail.com>
+| | Date:   Sun Nov 9 23:46:47 2025 -0600
+| | 
+| |     working example to query a local llm using llama-cpp-2 crate bindings, takes a while to build, and models likely to tweak
+| | 
+| |  Cargo.lock  | 402 ++++++++++++++++----------------------------------------
+| |  Cargo.toml  |   4 +-
+| |  src/main.rs |  98 +++++++++++++-
+| |  3 files changed, 212 insertions(+), 292 deletions(-)
+| | 
+| * commit ba5092a206bff30759db8a216093d55312393867
+| | Author: maxlayn1 <maxlayn1@gmail.com>
+| | Date:   Sun Nov 9 22:34:11 2025 -0600
+| | 
+| |     added steady_state dependency
+| | 
+| |  Cargo.lock | 1066 ++++++++++++++++++++++++++++++++++++++++++++++++++++++--
+| |  Cargo.toml |    1 +
+| |  2 files changed, 1032 insertions(+), 35 deletions(-)
+| | 
+| * commit 1a04ef2b88f03cb2fb6e39f4c75c92512af8f18f
+|   Author: maxlayn1 <maxlayn1@gmail.com>
+|   Date:   Sun Nov 9 22:20:42 2025 -0600
+|   
+|       Recreate prototype from scratch with llama_cpp added
+|   
+|    .gitignore  |  17 ++
+|    Cargo.lock  | 695 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+|    Cargo.toml  |   7 +
+|    src/main.rs |   3 +
+|    4 files changed, 722 insertions(+)
+|   
+| * commit ef13330159871f32c731e049c6c7f992a36911c0 (origin/presentation_prototype)
+| | Author: JaceAckerman <105801652+JaceAckerman@users.noreply.github.com>
+| | Date:   Mon Nov 10 18:25:27 2025 -0600
+| | 
+| |     Delete src/actor directory
+| | 
+| |  src/actor/profiler.rs | 28 ----------------------------
+| |  1 file changed, 28 deletions(-)
+| | 
+| * commit 4e2cbd5112db75e3d67c36a74fafa499cadc8b26
+|/  Author: JaceAckerman <105801652+JaceAckerman@users.noreply.github.com>
+|   Date:   Mon Nov 10 18:23:42 2025 -0600
+|   
+|       Initial commit for prototype for the presentation
+|   
+|    src/actors/file_crawler_2.rs |  83 +++++++++++++++++++++++++++++++
+|    src/actors/metadata.rs       |  90 ++++++++++++++++++++++++++++++++++
+|    src/args.rs                  |  27 +++++++++++
+|    src/main.rs                  | 102 +++++++++++++++++++++------------------
+|    4 files changed, 254 insertions(+), 48 deletions(-)
+|   
+*   commit 3c62169ef5ed519692f6b0dd1ac23c6dab453fcb
+|\  Merge: 78e974c 469b677
+| | Author: zaigiaz <155196761+zaigiaz@users.noreply.github.com>
+| | Date:   Wed Oct 29 14:16:37 2025 -0500
+| | 
+| |     Merge pull request #5 from zaigiaz/main
+| |     
+| |     another one
+| |   
+| *   commit 469b677a20676e509476cf439bdf83cc8392552b
+| |\  Merge: 6441306 78e974c
+| |/  Author: ZuggRugg <shayne.tman@gmail.com>
+|/|   Date:   Wed Oct 29 14:14:10 2025 -0500
+| |   
+| |       Merge branch 'main' of https://github.com/zaigiaz/Cruft-Crawler
+| |   
+* |   commit 78e974c8ff790888d90f38ea3ff8546de28b43f7
+|\ \  Merge: 3643df2 f14b457
+| | | Author: zaigiaz <155196761+zaigiaz@users.noreply.github.com>
+| | | Date:   Mon Oct 13 10:52:13 2025 -0500
+| | | 
+| | |     Merge pull request #4 from zaigiaz/main
+| | |     
+| | |     db notes
+| | | 
+| | * commit 6441306289a868ee1655dbddaa6d52117c69dd29
+| |/  Author: ZuggRugg <shayne.tman@gmail.com>
+| |   Date:   Wed Oct 29 14:13:48 2025 -0500
+| |   
+| |       deleted notes, updated src/ to have actors folder, working on prototype
+| |   
+| |    README.md              |   4 +
+| |    notes/db_schema.md     | 141 -------
+| |    notes/llm_kv_schema.md | 872 +++++++++++++++++++++++++++++++++++++++++++
+| |    src/actor/profiler.rs  |  28 ++
+| |    src/main.rs            |  65 +++-
+| |    5 files changed, 967 insertions(+), 143 deletions(-)
+| | 
+| * commit f14b4572bf9bf259aa211e010e0cca5da43e6fa0
+| | Author: ZuggRugg <shayne.tman@gmail.com>
+| | Date:   Mon Oct 13 10:51:13 2025 -0500
+| | 
+| |     fix
+| | 
+| |  notes/db_schema.md | 2 +-
+| |  1 file changed, 1 insertion(+), 1 deletion(-)
+| |   
+| *   commit a9cf05c3bb183e96ec14484d00248b18095f71b9
+| |\  Merge: 829cd51 3643df2
+| |/  Author: ZuggRugg <shayne.tman@gmail.com>
+|/|   Date:   Mon Oct 13 10:49:23 2025 -0500
+| |   
+| |       Merge branch 'main' of https://github.com/zaigiaz/Cruft-Crawler
+| |   
+* |   commit 3643df259f7bdb6afbb8c27929211bbd61f1e012
+|\ \  Merge: 0166458 c197e94
+| | | Author: ZuggRugg <155196761+ZuggRugg@users.noreply.github.com>
+| | | Date:   Wed Sep 24 16:55:40 2025 -0500
+| | | 
+| | |     Merge pull request #3 from ZuggRugg/main
+| | |     
+| | |     resources
+| | |   
+* | |   commit 01664586b36367f96b040e669eb9d1179d2b1c2b
+|\ \ \  Merge: 211fe32 c7c6bad
+| | | | Author: ZuggRugg <155196761+ZuggRugg@users.noreply.github.com>
+| | | | Date:   Wed Sep 24 16:38:15 2025 -0500
+| | | | 
+| | | |     Merge pull request #2 from ZuggRugg/main
+| | | |     
+| | | |     Project Setup
+| | | | 
+| | | * commit 829cd51694cf6e051ee095c202bcd4cdf04fc8a9
+| | |/  Author: ZuggRugg <shayne.tman@gmail.com>
+| | |   Date:   Mon Oct 13 10:48:58 2025 -0500
+| | |   
+| | |       Added notes for DB architecture
+| | |   
+| | |    notes/db_schema.md | 141 +++++++++++++++++++++++++++++++++++++++++++++
+| | |    1 file changed, 141 insertions(+)
+| | | 
+| | * commit c197e94c593a7d51182601732651e1b54c0b93e0
+| |/  Author: ZuggRugg <shayne.tman@gmail.com>
+| |   Date:   Wed Sep 24 16:54:27 2025 -0500
+| |   
+| |       resources
+| |   
+| |    README.md                  | 15 +++++++++++++++
+| |    notes/Project_Resources.md | 15 +++++++++++++++
+| |    2 files changed, 30 insertions(+)
+| | 
+| * commit c7c6bad73a10e4d028b66e85490c0c898cce9d58
+| | Author: ZuggRugg <shayne.tman@gmail.com>
+| | Date:   Wed Sep 24 16:33:46 2025 -0500
+| | 
+| |     project setup
+| | 
+| |  Cargo.lock                                       | 2682 ++++++++++++++++++
+| |  Cargo.toml                                       |    7 +
+| |  README.md                                        |    7 +-
+| |  .../SENIOR PROJ DESCRIPTION.pdf                  |  Bin
+| |  .../meeting questions and notes.txt              |    0
+| |  src/main.rs                                      |    3 +
+| |  6 files changed, 2698 insertions(+), 1 deletion(-)
+| |   
+| *   commit bc4e0b7313fbe51d25739e5ea43ff6c0d5b3f392
+| |\  Merge: e031a65 211fe32
+| |/  Author: ZuggRugg <shayne.tman@gmail.com>
+|/|   Date:   Wed Sep 24 16:20:16 2025 -0500
+| |   
+| |       Merge https://github.com/maxlayn1/Cruft-Crawler-Offline-AI-Driven-Background-Disk-Cleanup
+| | 
+* | commit 211fe3240e1e3c7d2a06f3ac17f76bd45462d2da
+| | Author: maxlayn1 <maxlayn1@gmail.com>
+| | Date:   Thu Sep 11 15:58:26 2025 -0500
+| | 
+| |     added some meeting notes and the project description
+| | 
+| |  SENIOR PROJ DESCRIPTION.pdf     | Bin 0 -> 140850 bytes
+| |  meeting questions and notes.txt |  37 ++++++++++++++++++++++++++++++++++++
+| |  2 files changed, 37 insertions(+)
+| | 
+| * commit e031a65a1c4a57e54cf68e3241ba10d325fa1e60
+|/  Author: ZuggRugg <shayne.tman@gmail.com>
+|   Date:   Mon Sep 8 15:16:14 2025 -0500
+|   
+|       test
+|   
+|    README.md | 2 +-
+|    1 file changed, 1 insertion(+), 1 deletion(-)
+| 
+* commit c1edd6e2a77823701a0584d2b76577e63d2d1d6a
+  Author: Maxim Tikhonov <maxlayn1@gmail.com>
+  Date:   Thu Sep 4 15:12:01 2025 -0500
+  
+      Initial commit
+  
+   .gitignore | 21 +++++++++++++++++++++
+   LICENSE    | 21 +++++++++++++++++++++
+   README.md  |  2 ++
+   3 files changed, 44 insertions(+)
