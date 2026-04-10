@@ -1,7 +1,0 @@
-Our Repo was initially split over multiple branches when we were developing different
-prototypes for our project, so I decided to just include the git-logs for each branch for the
-prototypes that Max and Jace worked on. The main git-log is just my work on the fork I have so far.
-
-Going forward we will have everything on 1-2 branches in a single repo.
-
-- Shayne
