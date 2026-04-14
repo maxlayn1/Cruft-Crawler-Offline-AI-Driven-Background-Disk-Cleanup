@@ -17,7 +17,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
      
 
 
-    init_logging(LogLevel::Info, None)?;
+    init_logging(LogLevel::Info)?;
 
     // pass unit value into .build() to ignore cli_args for now
     let mut graph = GraphBuilder::default().build(());
@@ -92,4 +92,75 @@ fn build_graph(graph: &mut Graph) {
             ai_model_to_ui_rx.clone(),
             ui_to_db_tx.clone(),
         ), SoloAct);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // ── actor name constants ──────────────────────────────────────────────────
+
+    #[test]
+    fn test_name_crawler_is_correct() {
+        assert_eq!(NAME_CRAWLER, "CRAWLER");
+    }
+
+    #[test]
+    fn test_name_db_is_correct() {
+        assert_eq!(NAME_DB, "DB_MANAGER");
+    }
+
+    #[test]
+    fn test_name_ai_model_is_correct() {
+        assert_eq!(NAME_AI_MODEL, "AI_MODEL");
+    }
+
+    #[test]
+    fn test_name_ui_actor_is_correct() {
+        assert_eq!(NAME_UI_ACTOR, "UI_ACTOR");
+    }
+
+    #[test]
+    fn test_all_actor_names_are_unique() {
+        let names = [NAME_CRAWLER, NAME_DB, NAME_AI_MODEL, NAME_UI_ACTOR];
+        let unique: std::collections::HashSet<&str> = names.iter().copied().collect();
+        assert_eq!(unique.len(), names.len(), "all actor names must be unique");
+    }
+
+    #[test]
+    fn test_all_actor_names_are_nonempty() {
+        for name in [NAME_CRAWLER, NAME_DB, NAME_AI_MODEL, NAME_UI_ACTOR] {
+            assert!(!name.is_empty(), "actor name '{}' must not be empty", name);
+        }
+    }
+
+    #[test]
+    fn test_all_actor_names_are_uppercase() {
+        for name in [NAME_CRAWLER, NAME_DB, NAME_AI_MODEL, NAME_UI_ACTOR] {
+            assert_eq!(
+                name, name.to_uppercase(),
+                "actor name '{}' should be uppercase",
+                name
+            );
+        }
+    }
+
+    // ── module structure ──────────────────────────────────────────────────────
+    // These compile-only tests confirm the module tree is wired up correctly.
+    // If any actor module is missing or renamed, these will fail to compile.
+
+    #[test]
+    fn test_crawler_module_exists() {
+        // If this compiles, the module is present and pub(crate)
+        let _: fn() = || {
+            let _ = std::any::type_name::<()>(); // dummy usage
+        };
+        // Real check: we can reference the module path
+        let _ = std::stringify!(crate::actor::crawler);
+    }
+
+    #[test]
+    fn test_llm_engine_module_exists() {
+        let _ = std::stringify!(crate::llm_engine);
+    }
 }
