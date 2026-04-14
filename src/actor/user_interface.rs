@@ -258,3 +258,281 @@ fn render(frame: &mut Frame, app: &mut App) {
     let status = Paragraph::new(app.status.as_str()).fg(Color::DarkGray);
     frame.render_widget(status, status_area);
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::path::PathBuf;
+    use std::sync::mpsc;
+
+    // ── helpers ───────────────────────────────────────────────────────────────
+
+    fn make_app() -> App {
+        let (suggest_tx, suggest_rx) = mpsc::channel::<PathBuf>();
+        let (delete_tx, delete_rx) = mpsc::channel::<PathBuf>();
+        // We keep suggest_tx and delete_rx alive in the returned app;
+        // leak them so they don't close the channels mid-test.
+        std::mem::forget(suggest_tx);
+        std::mem::forget(delete_rx);
+        App::new(suggest_rx, delete_tx)
+    }
+
+    fn make_app_with_channels() -> (App, mpsc::Sender<PathBuf>, mpsc::Receiver<PathBuf>) {
+        let (suggest_tx, suggest_rx) = mpsc::channel::<PathBuf>();
+        let (delete_tx, delete_rx) = mpsc::channel::<PathBuf>();
+        let app = App::new(suggest_rx, delete_tx);
+        (app, suggest_tx, delete_rx)
+    }
+
+    fn path(s: &str) -> PathBuf {
+        PathBuf::from(s)
+    }
+
+    // ── App::new ──────────────────────────────────────────────────────────────
+
+    #[test]
+    fn test_new_starts_empty() {
+        let app = make_app();
+        assert!(app.suggested_files.is_empty());
+        assert_eq!(app.status, "Waiting for AI suggestions...");
+    }
+
+    #[test]
+    fn test_new_selection_is_zero() {
+        let app = make_app();
+        // ListState starts at Some(0) per the constructor
+        assert_eq!(app.list_state.selected(), Some(0));
+    }
+
+    // ── selected_path ─────────────────────────────────────────────────────────
+
+    #[test]
+    fn test_selected_path_empty_list_returns_none() {
+        let app = make_app();
+        assert_eq!(app.selected_path(), None);
+    }
+
+    #[test]
+    fn test_selected_path_returns_correct_item() {
+        let mut app = make_app();
+        app.suggested_files.push(path("/tmp/a.txt"));
+        app.suggested_files.push(path("/tmp/b.txt"));
+        app.list_state.select(Some(1));
+        assert_eq!(app.selected_path(), Some(path("/tmp/b.txt")));
+    }
+
+    // ── clamp_selection ───────────────────────────────────────────────────────
+
+    #[test]
+    fn test_clamp_selection_empty_sets_none() {
+        let mut app = make_app();
+        app.list_state.select(Some(5));
+        app.clamp_selection();
+        assert_eq!(app.list_state.selected(), None);
+    }
+
+    #[test]
+    fn test_clamp_selection_out_of_bounds_clamps_to_last() {
+        let mut app = make_app();
+        app.suggested_files.push(path("/tmp/a.txt"));
+        app.suggested_files.push(path("/tmp/b.txt"));
+        app.list_state.select(Some(99));
+        app.clamp_selection();
+        assert_eq!(app.list_state.selected(), Some(1));
+    }
+
+    #[test]
+    fn test_clamp_selection_none_selects_first() {
+        let mut app = make_app();
+        app.suggested_files.push(path("/tmp/a.txt"));
+        app.list_state.select(None);
+        app.clamp_selection();
+        assert_eq!(app.list_state.selected(), Some(0));
+    }
+
+    #[test]
+    fn test_clamp_selection_in_bounds_unchanged() {
+        let mut app = make_app();
+        app.suggested_files.push(path("/a.txt"));
+        app.suggested_files.push(path("/b.txt"));
+        app.suggested_files.push(path("/c.txt"));
+        app.list_state.select(Some(1));
+        app.clamp_selection();
+        assert_eq!(app.list_state.selected(), Some(1));
+    }
+
+    // ── move_up / move_down ───────────────────────────────────────────────────
+
+    #[test]
+    fn test_move_up_decrements_selection() {
+        let mut app = make_app();
+        app.suggested_files.push(path("/a.txt"));
+        app.suggested_files.push(path("/b.txt"));
+        app.list_state.select(Some(1));
+        app.move_up();
+        assert_eq!(app.list_state.selected(), Some(0));
+    }
+
+    #[test]
+    fn test_move_up_at_zero_stays_zero() {
+        let mut app = make_app();
+        app.suggested_files.push(path("/a.txt"));
+        app.list_state.select(Some(0));
+        app.move_up();
+        assert_eq!(app.list_state.selected(), Some(0));
+    }
+
+    #[test]
+    fn test_move_down_increments_selection() {
+        let mut app = make_app();
+        app.suggested_files.push(path("/a.txt"));
+        app.suggested_files.push(path("/b.txt"));
+        app.list_state.select(Some(0));
+        app.move_down();
+        assert_eq!(app.list_state.selected(), Some(1));
+    }
+
+    #[test]
+    fn test_move_down_at_last_stays_at_last() {
+        let mut app = make_app();
+        app.suggested_files.push(path("/a.txt"));
+        app.suggested_files.push(path("/b.txt"));
+        app.list_state.select(Some(1));
+        app.move_down();
+        assert_eq!(app.list_state.selected(), Some(1));
+    }
+
+    // ── delete_selected ───────────────────────────────────────────────────────
+
+    #[test]
+    fn test_delete_selected_removes_file_and_sends_to_channel() {
+        let (mut app, _, delete_rx) = make_app_with_channels();
+        app.suggested_files.push(path("/tmp/del.txt"));
+        app.list_state.select(Some(0));
+
+        app.delete_selected();
+
+        assert!(app.suggested_files.is_empty());
+        assert!(app.status.contains("Deleted"));
+        // Confirm the path was forwarded to the delete channel
+        let received = delete_rx.try_recv().expect("path should have been sent");
+        assert_eq!(received, path("/tmp/del.txt"));
+    }
+
+    #[test]
+    fn test_delete_selected_nothing_selected_updates_status() {
+        let mut app = make_app();
+        app.list_state.select(None);
+        app.delete_selected();
+        assert_eq!(app.status, "No file selected.");
+    }
+
+    #[test]
+    fn test_delete_selected_clamps_after_removal() {
+        let (mut app, _, _delete_rx) = make_app_with_channels();
+        app.suggested_files.push(path("/a.txt"));
+        app.suggested_files.push(path("/b.txt"));
+        app.suggested_files.push(path("/c.txt"));
+        app.list_state.select(Some(2)); // last item
+
+        app.delete_selected();
+
+        // After removing the last item, selection should clamp to new last (index 1)
+        assert_eq!(app.list_state.selected(), Some(1));
+        assert_eq!(app.suggested_files.len(), 2);
+    }
+
+    // ── keep_selected ─────────────────────────────────────────────────────────
+
+    #[test]
+    fn test_keep_selected_removes_file_without_sending_to_delete() {
+        let (mut app, _, delete_rx) = make_app_with_channels();
+        app.suggested_files.push(path("/tmp/keep.txt"));
+        app.list_state.select(Some(0));
+
+        app.keep_selected();
+
+        assert!(app.suggested_files.is_empty());
+        assert!(app.status.contains("Kept"));
+        // Nothing should have been sent to the delete channel
+        assert!(delete_rx.try_recv().is_err());
+    }
+
+    #[test]
+    fn test_keep_selected_nothing_selected_updates_status() {
+        let mut app = make_app();
+        app.list_state.select(None);
+        app.keep_selected();
+        assert_eq!(app.status, "No file selected.");
+    }
+
+    // ── never_delete_selected ─────────────────────────────────────────────────
+
+    #[test]
+    fn test_never_delete_removes_file_from_list() {
+        let (mut app, _, _) = make_app_with_channels();
+        app.suggested_files.push(path("/tmp/never.txt"));
+        app.list_state.select(Some(0));
+
+        app.never_delete_selected();
+
+        assert!(app.suggested_files.is_empty());
+        assert!(app.status.contains("never-delete"));
+    }
+
+    #[test]
+    fn test_never_delete_nothing_selected_updates_status() {
+        let mut app = make_app();
+        app.list_state.select(None);
+        app.never_delete_selected();
+        assert_eq!(app.status, "No file selected.");
+    }
+
+    // ── poll_suggestions ──────────────────────────────────────────────────────
+
+    #[test]
+    fn test_poll_suggestions_adds_paths_to_list() {
+        let (mut app, suggest_tx, _) = make_app_with_channels();
+        suggest_tx.send(path("/tmp/new1.txt")).unwrap();
+        suggest_tx.send(path("/tmp/new2.txt")).unwrap();
+
+        app.poll_suggestions();
+
+        assert_eq!(app.suggested_files.len(), 2);
+        assert_eq!(app.suggested_files[0], path("/tmp/new1.txt"));
+        assert_eq!(app.suggested_files[1], path("/tmp/new2.txt"));
+    }
+
+    #[test]
+    fn test_poll_suggestions_sets_selection_when_first_item_arrives() {
+        let (mut app, suggest_tx, _) = make_app_with_channels();
+        app.list_state.select(None);  // start with no selection
+        suggest_tx.send(path("/tmp/first.txt")).unwrap();
+
+        app.poll_suggestions();
+
+        assert_eq!(app.list_state.selected(), Some(0));
+    }
+
+    #[test]
+    fn test_poll_suggestions_empty_channel_does_nothing() {
+        let (mut app, _suggest_tx, _) = make_app_with_channels();
+        app.poll_suggestions();
+        assert!(app.suggested_files.is_empty());
+    }
+
+    #[test]
+    fn test_poll_suggestions_does_not_reset_existing_selection() {
+        let (mut app, suggest_tx, _) = make_app_with_channels();
+        app.suggested_files.push(path("/existing.txt"));
+        app.list_state.select(Some(0));
+
+        suggest_tx.send(path("/new.txt")).unwrap();
+        app.poll_suggestions();
+
+        // Selection should still be 0 (unchanged) since it was already set
+        assert_eq!(app.list_state.selected(), Some(0));
+        assert_eq!(app.suggested_files.len(), 2);
+    }
+}
+

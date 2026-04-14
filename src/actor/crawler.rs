@@ -242,3 +242,172 @@ pub fn visit_dir(
     }
     Ok(metas)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs::{self, File};
+    use std::io::Write;
+    use std::path::PathBuf;
+
+    // ── helpers ───────────────────────────────────────────────────────────────
+
+    fn make_meta(file_name: &str, size: u64, modified: i64, readonly: bool) -> FileMeta {
+        FileMeta {
+            rel_path: PathBuf::from(file_name),
+            abs_path: PathBuf::from(format!("/tmp/{}", file_name)),
+            file_name: file_name.to_string(),
+            hash: String::new(),
+            is_file: true,
+            size,
+            modified,
+            created: 0,
+            readonly,
+        }
+    }
+
+    // ── FileMeta::to_bytes / from_bytes roundtrip ────────────────────────────
+
+    #[test]
+    fn test_serialize_deserialize_roundtrip() {
+        let meta = make_meta("test.txt", 1024, 1700000000, false);
+        let bytes = meta.to_bytes().expect("serialization failed");
+        let restored = FileMeta::from_bytes(&bytes).expect("deserialization failed");
+        assert_eq!(meta, restored);
+    }
+
+    #[test]
+    fn test_serialize_preserves_all_fields() {
+        let meta = FileMeta {
+            rel_path: PathBuf::from("some/relative/path.rs"),
+            abs_path: PathBuf::from("/absolute/path.rs"),
+            file_name: "path.rs".to_string(),
+            hash: "abc123deadbeef".to_string(),
+            is_file: true,
+            size: 99999,
+            modified: 1700000000,
+            created: 1600000000,
+            readonly: true,
+        };
+        let bytes = meta.to_bytes().unwrap();
+        let restored = FileMeta::from_bytes(&bytes).unwrap();
+        assert_eq!(restored.file_name, "path.rs");
+        assert_eq!(restored.hash, "abc123deadbeef");
+        assert_eq!(restored.size, 99999);
+        assert_eq!(restored.readonly, true);
+        assert_eq!(restored.is_file, true);
+        assert_eq!(restored.created, 1600000000);
+    }
+
+    #[test]
+    fn test_deserialize_invalid_bytes_returns_error() {
+        let bad_bytes = vec![0xDE, 0xAD, 0xBE, 0xEF, 0x00, 0x01];
+        assert!(FileMeta::from_bytes(&bad_bytes).is_err());
+    }
+
+    #[test]
+    fn test_serialize_empty_hash_and_paths() {
+        let meta = FileMeta {
+            rel_path: PathBuf::new(),
+            abs_path: PathBuf::new(),
+            file_name: String::new(),
+            hash: String::new(),
+            is_file: false,
+            size: 0,
+            modified: 0,
+            created: 0,
+            readonly: false,
+        };
+        let bytes = meta.to_bytes().unwrap();
+        let restored = FileMeta::from_bytes(&bytes).unwrap();
+        assert_eq!(meta, restored);
+    }
+
+    // ── FileMeta equality / clone ─────────────────────────────────────────────
+
+    #[test]
+    fn test_clone_is_equal() {
+        let meta = make_meta("clone_test.log", 512, 1700000000, false);
+        let cloned = meta.clone();
+        assert_eq!(meta, cloned);
+    }
+
+    #[test]
+    fn test_different_metas_are_not_equal() {
+        let a = make_meta("a.txt", 100, 1000, false);
+        let b = make_meta("b.txt", 200, 2000, true);
+        assert_ne!(a, b);
+    }
+
+    // ── get_file_hash ─────────────────────────────────────────────────────────
+
+    #[test]
+    fn test_get_file_hash_returns_hex_string() {
+        // Create a real temp file to hash
+        let path = std::env::temp_dir().join("cruft_hash_test.txt");
+        let mut f = File::create(&path).unwrap();
+        f.write_all(b"hello cruftcrawler").unwrap();
+
+        let hash = get_file_hash(path.clone()).expect("hash should succeed");
+        // SHA-256 hex output is always 64 characters
+        assert_eq!(hash.len(), 64);
+        // Should only contain hex characters
+        assert!(hash.chars().all(|c| c.is_ascii_hexdigit()));
+
+        fs::remove_file(path).ok();
+    }
+
+    #[test]
+    fn test_get_file_hash_same_content_same_hash() {
+        let path1 = std::env::temp_dir().join("cruft_hash_a.txt");
+        let path2 = std::env::temp_dir().join("cruft_hash_b.txt");
+
+        for p in [&path1, &path2] {
+            let mut f = File::create(p).unwrap();
+            f.write_all(b"identical content").unwrap();
+        }
+
+        let hash1 = get_file_hash(path1.clone()).unwrap();
+        let hash2 = get_file_hash(path2.clone()).unwrap();
+        assert_eq!(hash1, hash2);
+
+        fs::remove_file(path1).ok();
+        fs::remove_file(path2).ok();
+    }
+
+    #[test]
+    fn test_get_file_hash_different_content_different_hash() {
+        let path1 = std::env::temp_dir().join("cruft_diff_a.txt");
+        let path2 = std::env::temp_dir().join("cruft_diff_b.txt");
+
+        let mut f1 = File::create(&path1).unwrap();
+        f1.write_all(b"content A").unwrap();
+
+        let mut f2 = File::create(&path2).unwrap();
+        f2.write_all(b"content B").unwrap();
+
+        let hash1 = get_file_hash(path1.clone()).unwrap();
+        let hash2 = get_file_hash(path2.clone()).unwrap();
+        assert_ne!(hash1, hash2);
+
+        fs::remove_file(path1).ok();
+        fs::remove_file(path2).ok();
+    }
+
+    #[test]
+    fn test_get_file_hash_nonexistent_file_returns_error() {
+        let result = get_file_hash(PathBuf::from("/tmp/definitely_does_not_exist_xyz.txt"));
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_get_file_hash_empty_file() {
+        let path = std::env::temp_dir().join("cruft_empty.txt");
+        File::create(&path).unwrap(); // creates empty file
+
+        let hash = get_file_hash(path.clone()).expect("empty file hash should succeed");
+        assert_eq!(hash.len(), 64);
+
+        fs::remove_file(path).ok();
+    }
+}

@@ -149,3 +149,159 @@ impl LlmEngine {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+    use std::io::Read;
+
+    // ── helpers ───────────────────────────────────────────────────────────────
+    // We can't construct a real LlmEngine without a .gguf model file, so we
+    // extract write_response_to_file's logic into a standalone helper to test
+    // the I/O behavior directly.
+
+    fn write_response(path: &str, response: &str) -> anyhow::Result<()> {
+        let mut file = fs::OpenOptions::new()
+            .append(true)
+            .create(true)
+            .open(path)?;
+        writeln!(file, "{}", response)?;
+        Ok(())
+    }
+
+    fn temp_path(name: &str) -> String {
+        std::env::temp_dir()
+            .join(name)
+            .to_string_lossy()
+            .to_string()
+    }
+
+    fn cleanup(path: &str) {
+        let _ = fs::remove_file(path);
+    }
+
+    // ── write_response_to_file behavior ──────────────────────────────────────
+
+    #[test]
+    fn test_write_creates_file_if_not_exists() {
+        let path = temp_path("llm_test_create.txt");
+        cleanup(&path);
+
+        write_response(&path, "Decision: delete").unwrap();
+
+        assert!(fs::metadata(&path).is_ok(), "file should have been created");
+        cleanup(&path);
+    }
+
+    #[test]
+    fn test_write_content_is_correct() {
+        let path = temp_path("llm_test_content.txt");
+        cleanup(&path);
+
+        write_response(&path, "Decision: keep").unwrap();
+
+        let content = fs::read_to_string(&path).unwrap();
+        assert!(content.contains("Decision: keep"));
+        cleanup(&path);
+    }
+
+    #[test]
+    fn test_write_appends_not_overwrites() {
+        let path = temp_path("llm_test_append.txt");
+        cleanup(&path);
+
+        write_response(&path, "first response").unwrap();
+        write_response(&path, "second response").unwrap();
+
+        let content = fs::read_to_string(&path).unwrap();
+        assert!(content.contains("first response"));
+        assert!(content.contains("second response"));
+        cleanup(&path);
+    }
+
+    #[test]
+    fn test_write_adds_newline_after_response() {
+        let path = temp_path("llm_test_newline.txt");
+        cleanup(&path);
+
+        write_response(&path, "some output").unwrap();
+
+        let content = fs::read_to_string(&path).unwrap();
+        assert!(content.ends_with('\n'), "writeln! should append a newline");
+        cleanup(&path);
+    }
+
+    #[test]
+    fn test_write_empty_string() {
+        let path = temp_path("llm_test_empty.txt");
+        cleanup(&path);
+
+        write_response(&path, "").unwrap();
+
+        let content = fs::read_to_string(&path).unwrap();
+        // writeln!("") produces just a newline
+        assert_eq!(content, "\n");
+        cleanup(&path);
+    }
+
+    #[test]
+    fn test_write_multiple_lines_accumulated() {
+        let path = temp_path("llm_test_multi.txt");
+        cleanup(&path);
+
+        let responses = vec!["alpha", "beta", "gamma"];
+        for r in &responses {
+            write_response(&path, r).unwrap();
+        }
+
+        let content = fs::read_to_string(&path).unwrap();
+        for r in &responses {
+            assert!(content.contains(r));
+        }
+        assert_eq!(content.lines().count(), 3);
+        cleanup(&path);
+    }
+
+    #[test]
+    fn test_write_special_characters() {
+        let path = temp_path("llm_test_special.txt");
+        cleanup(&path);
+
+        let response = "Decision: delete | /tmp/cache~.bak | size=204 bytes";
+        write_response(&path, response).unwrap();
+
+        let content = fs::read_to_string(&path).unwrap();
+        assert!(content.contains("Decision: delete"));
+        assert!(content.contains("/tmp/cache~.bak"));
+        cleanup(&path);
+    }
+
+    #[test]
+    fn test_write_unicode_content() {
+        let path = temp_path("llm_test_unicode.txt");
+        cleanup(&path);
+
+        write_response(&path, "файл удалить").unwrap();
+
+        let content = fs::read_to_string(&path).unwrap();
+        assert!(content.contains("файл удалить"));
+        cleanup(&path);
+    }
+
+    #[test]
+    fn test_write_to_invalid_path_returns_error() {
+        // A path inside a nonexistent directory should fail
+        let result = write_response("/nonexistent_dir_xyz/output.txt", "test");
+        assert!(result.is_err());
+    }
+
+    // ── load_new_model: invalid path returns error ────────────────────────────
+    // This is the only load_new_model path we can test without the .gguf file.
+
+    #[test]
+    fn test_load_new_model_nonexistent_path_returns_error() {
+        let result = LlmEngine::load_new_model("/nonexistent/path/model.gguf");
+        assert!(result.is_err(), "loading a missing model file should fail");
+    }
+}
