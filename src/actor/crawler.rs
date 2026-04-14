@@ -12,6 +12,7 @@ use std::error::Error;
 use serde::{Serialize, Deserialize};
 use hex;
 
+const WINDOWS_TO_UNIX_EPOCH_OFFSET: i64 = 11_644_473_600;
 // TODO: implement fallback logic
 // TODO: implement file cruft_utils.rs for get_file_hash and other non actor utilities to reside in
 
@@ -88,7 +89,7 @@ async fn internal_behavior<A: SteadyActor>(
     let mut crawler_tx = crawler_tx.lock().await;
     let mut crawler_to_ai_model_tx = crawler_to_ai_model_tx.lock().await;
 
-    let path1 = Path::new("C:/School/testfolder");
+    let path1 = Path::new("C:/Users/tiger/Downloads");
     let metas: Vec<FileMeta> = visit_dir(path1, &state)?;
 
     // ← one file per iteration instead of dumping all at once
@@ -114,8 +115,7 @@ async fn internal_behavior<A: SteadyActor>(
                             SendOutcome::Success => break,
                             SendOutcome::Blocked(_) => continue,
                             other => {
-                                eprintln!("Send to DB failed: {:?}", other);
-                                break;
+                                
                             }
                         }
                     }
@@ -134,7 +134,7 @@ async fn internal_behavior<A: SteadyActor>(
                         SendOutcome::Success => break,
                         SendOutcome::Blocked(_) => continue,
                         other => {
-                            eprintln!("Send to AI failed: {:?}", other);
+                            
                             break;
                         }
                     }
@@ -147,7 +147,7 @@ async fn internal_behavior<A: SteadyActor>(
                         SendOutcome::Success => break,
                         SendOutcome::Blocked(_) => continue,
                         other => {
-                            eprintln!("Send to DB failed: {:?}", other);
+                          
                             break;
                         }
                     }
@@ -199,9 +199,22 @@ pub fn visit_dir(
             Ok(md) => {
                 let is_file:  bool = md.is_file();
                 let size:     u64  = md.len();
-                let modified: i64  = FileTime::from_last_modification_time(&md).seconds();
-                let created:  i64  = FileTime::from_creation_time(&md)
-                                        .expect("created file time").seconds();
+                //windows and unix timestamps are different so you must convert the timestamps to seconds differently
+                let modified: i64 = {
+                    let raw = FileTime::from_last_modification_time(&md).seconds();
+                    #[cfg(target_os = "windows")]
+                    let raw = raw - WINDOWS_TO_UNIX_EPOCH_OFFSET;
+                    raw
+                };
+                //windows and unix timestamps are different so you must convert the timestamps to seconds differently
+                let created: i64 = FileTime::from_creation_time(&md)
+                    .map(|ft| {
+                        let raw = ft.seconds();
+                        #[cfg(target_os = "windows")]
+                        let raw = raw - 11_644_473_600;
+                        raw
+                    })
+                    .unwrap_or(modified);
                 let readonly: bool = md.permissions().readonly();
                 let mut hash: String = String::new();
 
