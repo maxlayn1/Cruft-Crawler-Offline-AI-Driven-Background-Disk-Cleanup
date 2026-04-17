@@ -74,6 +74,61 @@ pub async fn run(
     }
 }
 
+fn load_scan_dir() -> PathBuf {
+    let config_file = PathBuf::from("scan_path.txt");
+
+    if !config_file.exists() {
+        eprintln!("\n  ✗ CruftCrawler could not start.");
+        eprintln!("  No 'scan_path.txt' file was found in the current directory.");
+        eprintln!("  Please create a file named 'scan_path.txt' next to the executable");
+        eprintln!("  and put the directory you want to scan on the first line.");
+        eprintln!();
+        eprintln!("  Example (Windows):  C:\\Users\\YourName\\Documents");
+        eprintln!("  Example (Linux):    /home/yourname/documents");
+        eprintln!();
+        std::process::exit(1);
+    }
+
+    let contents = std::fs::read_to_string(&config_file).unwrap_or_else(|e| {
+        eprintln!("\n  ✗ CruftCrawler could not start.");
+        eprintln!("  Found 'scan_path.txt' but could not read it: {}", e);
+        eprintln!();
+        std::process::exit(1);
+    });
+
+    let trimmed = contents.trim().to_string();
+
+    if trimmed.is_empty() {
+        eprintln!("\n  ✗ CruftCrawler could not start.");
+        eprintln!("  'scan_path.txt' exists but is empty.");
+        eprintln!("  Please put the directory you want to scan on the first line.");
+        eprintln!();
+        std::process::exit(1);
+    }
+
+    let path = PathBuf::from(&trimmed);
+
+    if !path.exists() {
+        eprintln!("\n  ✗ CruftCrawler could not start.");
+        eprintln!("  The path in 'scan_path.txt' does not exist:");
+        eprintln!("    {}", trimmed);
+        eprintln!("  Please check the path is spelled correctly.");
+        eprintln!();
+        std::process::exit(1);
+    }
+
+    if !path.is_dir() {
+        eprintln!("\n  ✗ CruftCrawler could not start.");
+        eprintln!("  The path in 'scan_path.txt' is not a directory:");
+        eprintln!("    {}", trimmed);
+        eprintln!("  Please provide a folder path, not a file path.");
+        eprintln!();
+        std::process::exit(1);
+    }
+
+    path
+}
+
 async fn internal_behavior<A: SteadyActor>(
     mut actor: A,
     crawler_tx: SteadyTx<FileMeta>,
@@ -89,8 +144,10 @@ async fn internal_behavior<A: SteadyActor>(
     let mut crawler_tx = crawler_tx.lock().await;
     let mut crawler_to_ai_model_tx = crawler_to_ai_model_tx.lock().await;
 
-    let path1 = Path::new("C:/Users/tiger/Downloads");
-    let metas: Vec<FileMeta> = visit_dir(path1, &state)?;
+    
+
+    let path = load_scan_dir();
+    let metas: Vec<FileMeta> = visit_dir(&path, &state)?;
 
     // ← one file per iteration instead of dumping all at once
     let mut metas_iter = metas.iter();
@@ -159,6 +216,7 @@ async fn internal_behavior<A: SteadyActor>(
                 break;
             }
         }
+        actor.wait_periodic(std::time::Duration::from_secs(10)).await;
     }
 
     Ok(())

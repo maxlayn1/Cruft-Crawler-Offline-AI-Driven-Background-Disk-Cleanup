@@ -5,8 +5,24 @@ use steady_state::*;
 use crate::llm_engine::LlmEngine;
 use crate::actor::crawler::FileMeta;
 use std::fs;
+use std::path::PathBuf;
 
-const MODEL_FILE_PATH: &str = "./src/models/Llama-3.2-3B-Instruct-UD-Q8_K_XL.gguf";
+// Scans `./src/models/` and returns the path to the first `.gguf` file found.
+/// Returns an error if the directory doesn't exist or contains no `.gguf` files.
+fn find_model_file() -> Result<PathBuf, Box<dyn std::error::Error>> {
+    let models_dir = std::path::Path::new("./src/models");
+
+    let entry = fs::read_dir(models_dir)
+        .map_err(|e| format!("Could not open models directory './src/models': {}", e))?
+        .filter_map(|res| res.ok())
+        .map(|e| e.path())
+        .find(|p| p.extension().and_then(|ext| ext.to_str()) == Some("gguf"))
+        .ok_or_else(|| "No .gguf model file found in './src/models'".to_string())?;
+
+    Ok(entry)
+}
+
+
 
 pub async fn run(
     actor: SteadyActorShadow,
@@ -30,7 +46,13 @@ async fn internal_behavior<A: SteadyActor>(
     let mut crawler_to_ai_model_rx = crawler_to_ai_model_rx.lock().await;
     let mut ai_model_to_ui_tx = ai_model_to_ui_tx.lock().await;
 
-    let engine = match LlmEngine::load_new_model(MODEL_FILE_PATH) {
+    let model_path = find_model_file()?;
+    let model_path_str = model_path
+        .to_str()
+        .ok_or("Model path contains invalid UTF-8")?;
+    eprintln!("AI_MODEL: loading model from {}", model_path_str);
+
+    let engine = match LlmEngine::load_new_model(model_path_str) {
         Ok(e) => e,
         Err(e) => return Err(e.into()),
     };
@@ -50,11 +72,11 @@ async fn internal_behavior<A: SteadyActor>(
        
         let verdict = match engine.infer_model(&prompt) {
             Ok(raw) => {
-                eprintln!("AI_MODEL: raw output: {:?}", raw);
+                //eprintln!("AI_MODEL: raw output: {:?}", raw);
                 parse_verdict(&raw)
             }
             Err(e) => {
-                eprintln!("AI_MODEL: inference FAILED: {}", e);
+                //eprintln!("AI_MODEL: inference FAILED: {}", e);
                 continue;
             }
         };
