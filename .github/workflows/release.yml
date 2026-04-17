@@ -1,0 +1,131 @@
+name: Build Cruft Executables
+
+on:
+  workflow_dispatch:   # lets you trigger manually from GitHub UI
+  push:
+    tags:
+      - 'v*'           # also triggers on version tags like v1.0.0
+
+permissions:
+  contents: write
+
+jobs:
+
+  build-windows:
+    name: Windows EXE
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install LLVM
+        uses: KyleMayes/install-llvm-action@v2
+        with:
+          version: "17"
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: windows-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Build
+        run: cargo build --release --target x86_64-pc-windows-msvc
+        env:
+          LIBCLANG_PATH: ${{ env.LLVM_PATH }}\bin
+
+      - name: Upload EXE
+        uses: actions/upload-artifact@v4
+        with:
+          name: cruft-windows
+          path: target/x86_64-pc-windows-msvc/release/cruft.exe
+
+  build-linux:
+    name: Linux Binary
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y build-essential cmake libclang-dev clang
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: linux-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Build
+        run: cargo build --release
+        env:
+          LIBCLANG_PATH: /usr/lib/llvm-14/lib
+
+      - name: Upload Binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: cruft-linux
+          path: target/release/cruft
+
+  build-macos:
+    name: macOS Binary
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          brew install cmake llvm
+          echo "LIBCLANG_PATH=$(brew --prefix llvm)/lib" >> $GITHUB_ENV
+          echo "$(brew --prefix llvm)/bin" >> $GITHUB_PATH
+
+      - name: Install Rust + both Apple targets
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-apple-darwin,aarch64-apple-darwin
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: macos-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Build Intel
+        run: cargo build --release --target x86_64-apple-darwin
+        env:
+          LIBCLANG_PATH: ${{ env.LIBCLANG_PATH }}
+
+      - name: Build Apple Silicon
+        run: cargo build --release --target aarch64-apple-darwin
+        env:
+          LIBCLANG_PATH: ${{ env.LIBCLANG_PATH }}
+
+      - name: Merge into Universal Binary
+        run: |
+          lipo -create \
+            target/x86_64-apple-darwin/release/cruft \
+            target/aarch64-apple-darwin/release/cruft \
+            -output cruft-macos-universal
+
+      - name: Upload Binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: cruft-macos
+          path: cruft-macos-universal
