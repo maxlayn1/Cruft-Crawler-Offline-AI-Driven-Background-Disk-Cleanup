@@ -23,19 +23,20 @@ jobs:
         run: git config --system core.longpaths true
         shell: cmd
 
-      - name: Create short source and target directories
+      - name: Set short source and target paths
         run: |
-          New-Item -ItemType Directory -Force C:\s | Out-Null
-          New-Item -ItemType Directory -Force C:\ct | Out-Null
-        shell: pwsh
-
-      - name: Redirect cargo target to short path
-        run: echo "CARGO_TARGET_DIR=C:\ct" >> $env:GITHUB_ENV
+          echo "CARGO_TARGET_DIR=C:\ct" >> $env:GITHUB_ENV
+          echo "BUILD_SRC=C:\s" >> $env:GITHUB_ENV
         shell: pwsh
 
       - uses: actions/checkout@v4
-        with:
-          path: C:\s
+
+      - name: Copy source to short path
+        run: |
+          New-Item -ItemType Directory -Force C:\s | Out-Null
+          robocopy "$env:GITHUB_WORKSPACE" "C:\s" /E /NFL /NDL /NJH /NJS /nc /ns /np
+          exit 0
+        shell: pwsh
 
       - name: Install LLVM
         uses: KyleMayes/install-llvm-action@v2
@@ -58,7 +59,7 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             C:\ct
-          key: windows-${{ hashFiles('C:/s/**/Cargo.lock') }}
+          key: windows-${{ hashFiles('**/Cargo.lock') }}
 
       - name: Build
         run: cargo build --release --target x86_64-pc-windows-msvc
