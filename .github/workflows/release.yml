@@ -16,7 +16,7 @@ jobs:
     runs-on: windows-latest
     steps:
       - name: Enable Windows long paths via registry
-        run: reg add "HKLM\\SYSTEM\\CurrentControlSet\\Control\\FileSystem" /v LongPathsEnabled /t REG_DWORD /d 1 /f
+        run: reg add "HKLM\SYSTEM\CurrentControlSet\Control\FileSystem" /v LongPathsEnabled /t REG_DWORD /d 1 /f
         shell: cmd
 
       - name: Configure git for long paths
