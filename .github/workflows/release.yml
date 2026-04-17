@@ -11,10 +11,22 @@ permissions:
 
 jobs:
 
-  build-windows:
+    build-windows:
     name: Windows EXE
     runs-on: windows-latest
     steps:
+      - name: Enable Windows long paths via registry
+        run: reg add "HKLM\SYSTEM\CurrentControlSet\Control\FileSystem" /v LongPathsEnabled /t REG_DWORD /d 1 /f
+        shell: cmd
+
+      - name: Configure git for long paths
+        run: git config --system core.longpaths true
+        shell: cmd
+
+      - name: Redirect cargo target to short path
+        run: echo "CARGO_TARGET_DIR=C:\ct" >> $env:GITHUB_ENV
+        shell: pwsh
+
       - uses: actions/checkout@v4
 
       - name: Install LLVM
@@ -22,30 +34,32 @@ jobs:
         with:
           version: "17"
 
+      - name: Set LIBCLANG_PATH
+        run: echo "LIBCLANG_PATH=$env:LLVM_PATH\bin" >> $env:GITHUB_ENV
+        shell: pwsh
+
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: x86_64-pc-windows-msvc
 
-      - name: Cache cargo
+      - name: Cache cargo registry
         uses: actions/cache@v4
         with:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
-            target
+            C:\ct
           key: windows-${{ hashFiles('**/Cargo.lock') }}
 
       - name: Build
         run: cargo build --release --target x86_64-pc-windows-msvc
-        env:
-          LIBCLANG_PATH: ${{ env.LLVM_PATH }}\bin
 
       - name: Upload EXE
         uses: actions/upload-artifact@v4
         with:
           name: cruft-windows
-          path: target/x86_64-pc-windows-msvc/release/cruft.exe
+          path: C:\ct\x86_64-pc-windows-msvc\release\cruft.exe
 
   build-linux:
     name: Linux Binary
